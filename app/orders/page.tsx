@@ -10,9 +10,17 @@ import Link from "next/link"
 import { orderStorage, type LocalOrderDto } from "@/lib/auth"
 
 const statusConfig = {
-  preparing: { label: "준비중", color: "bg-orange-500", icon: Clock },
-  ready: { label: "픽업대기", color: "bg-blue-500", icon: CheckCircle },
-  completed: { label: "완료", color: "bg-green-500", icon: CheckCircle },
+  PENDING: { label: "주문접수", color: "bg-yellow-500", icon: Clock },
+  CONFIRMED: { label: "확정됨", color: "bg-blue-500", icon: CheckCircle },
+  COMPLETED: { label: "완료", color: "bg-green-500", icon: CheckCircle },
+}
+
+const fetchOrders = async (userId: number) => {
+  const response = await fetch(`http://ajoutonback.hunian.site/orders/all_detail?userId=${userId}`)
+  if (!response.ok) {
+    throw new Error("주문 내역을 불러오는 데 실패했습니다.")
+  }
+  return await response.json()
 }
 
 export default function OrdersPage() {
@@ -20,30 +28,38 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<LocalOrderDto[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 실제 주문 데이터 로딩
+  const [userId, setUserId] = useState<number | null>(null)
+
+
   useEffect(() => {
-    const loadOrders = async () => {
-      setLoading(true)
+    const rawUser = localStorage.getItem("user")
+    if (rawUser) {
       try {
-        const orderData = orderStorage.getOrders()
-        setOrders(orderData)
-      } catch (error) {
-        console.error("주문 내역 로딩 실패:", error)
-        setOrders([])
-      } finally {
-        setLoading(false)
+        const parsed = JSON.parse(rawUser)
+        setUserId(parsed.id)
+      } catch (e) {
+        console.error("유저 정보 파싱 에러:", e)
       }
     }
-    loadOrders()
-
-    // 주문 변경 이벤트 리스너
-    const handleOrdersChange = () => {
-      loadOrders()
-    }
-
-    window.addEventListener("ordersChanged", handleOrdersChange)
-    return () => window.removeEventListener("ordersChanged", handleOrdersChange)
   }, [])
+
+  useEffect(() => {
+  const loadOrders = async () => {
+    if (userId == null) return
+    setLoading(true)
+    try {
+      const data = await fetchOrders(userId)
+      setOrders(data)
+    } catch (error) {
+      console.error("주문 불러오기 실패:", error)
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+    loadOrders()
+  }, [userId])
 
   // 필터링된 주문 목록
   const filteredOrders = orders.filter((order) => {
@@ -104,7 +120,14 @@ export default function OrdersPage() {
             </div>
           ) : (
             filteredOrders.map((order) => {
-              const StatusIcon = statusConfig[order.status as keyof typeof statusConfig].icon
+              const statusInfo = statusConfig[order.status as keyof typeof statusConfig]
+
+              if (!statusInfo) {
+                console.error("알 수 없는 주문 상태:", order.status)
+                return null // 또는 fallback UI 반환
+              }
+
+              const StatusIcon = statusInfo.icon
               return (
                 <Card key={order.id} className="mx-4">
                   <CardContent className="p-4">
@@ -120,7 +143,7 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="space-y-1 mb-3">
-                      {order.items.map((item, index) => (
+                      {(order.items ?? []).map((item, index) => (
                         <p key={index} className="text-sm text-gray-700">
                           • {item.menuName} x {item.quantity}
                         </p>
@@ -128,8 +151,10 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
-                      <span>주문시간: {order.orderTime}</span>
-                      <span className="font-bold text-lg text-gray-900">{order.totalAmount.toLocaleString()}원</span>
+                      <span>주문시간: {order.orderTime ?? "정보 없음"}</span>
+                      <span className="font-bold text-lg text-gray-900">
+                        {(order.price ?? 0).toLocaleString()}원
+                      </span>
                     </div>
 
                     {order.status === "completed" && (
