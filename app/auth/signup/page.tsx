@@ -34,9 +34,9 @@ export default function SignupPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    stdNum: "",
-    depart: "",
-    role: "STUDENT", // HARDCODED: 기본값을 학생으로 설정
+    studentNumber: "", // stdNum -> studentNumber로 변경
+    department: "", // depart -> department로 변경
+    role: "user", // USER -> user로 변경 (DB 스키마에 맞게)
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -63,12 +63,12 @@ export default function SignupPage() {
       return
     }
 
-    if (!formData.stdNum) {
+    if (!formData.studentNumber) {
       setError("학번을 입력해주세요.")
       return
     }
 
-    if (!formData.depart) {
+    if (!formData.department) {
       setError("학과를 선택해주세요.")
       return
     }
@@ -76,13 +76,15 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
+      console.log("회원가입 시도 중...")
+
       await authAPI.signup({
         email: formData.email,
         name: formData.name,
         role: formData.role,
         password: formData.password,
-        stdNum: formData.stdNum,
-        depart: formData.depart,
+        studentNumber: formData.studentNumber, // 필드명 변경
+        department: formData.department, // 필드명 변경
       })
 
       setSuccess("회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.")
@@ -93,7 +95,13 @@ export default function SignupPage() {
       }, 3000)
     } catch (error) {
       console.error("회원가입 오류:", error)
-      setError(error instanceof Error ? error.message : "회원가입에 실패했습니다.")
+
+      let errorMessage = "회원가입에 실패했습니다."
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -169,23 +177,23 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="stdNum">학번</Label>
+                <Label htmlFor="studentNumber">학번</Label>
                 <Input
-                  id="stdNum"
+                  id="studentNumber"
                   type="text"
                   placeholder="202012345"
-                  value={formData.stdNum}
-                  onChange={(e) => updateFormData("stdNum", e.target.value)}
+                  value={formData.studentNumber}
+                  onChange={(e) => updateFormData("studentNumber", e.target.value)}
                   required
                   disabled={isLoading}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="depart">학과</Label>
+                <Label htmlFor="department">학과</Label>
                 <Select
-                  value={formData.depart}
-                  onValueChange={(value: string) => updateFormData("depart", value)}
+                  value={formData.department}
+                  onValueChange={(value) => updateFormData("department", value)}
                   disabled={isLoading}
                 >
                   <SelectTrigger>
