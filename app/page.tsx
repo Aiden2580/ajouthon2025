@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-// TODO: API 연동 - axios 또는 fetch를 위한 import 추가
-// import axios from 'axios'
+import { useState, useEffect } from "react"
+import AuthGuard from "@/lib/AuthGuard"
+import { storeAPI } from "@/lib/auth"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,177 +11,51 @@ import { Badge } from "@/components/ui/badge"
 import { Search, ShoppingCart, Star, Clock, MapPin, X } from "lucide-react"
 import Link from "next/link"
 
-// TODO: API 연동 - 실제 API에서 매장 데이터를 가져오는 함수
-// const fetchStores = async () => {
-//   try {
-//     const response = await fetch('/api/stores')
-//     const data = await response.json()
-//     return data
-//   } catch (error) {
-//     console.error('매장 데이터 로딩 실패:', error)
-//     return []
-//   }
-// }
-
-// TODO: API 연동 - 검색 API 함수 (매장명 + 메뉴명 검색)
-// const searchStoresAndMenus = async (query: string, category?: string) => {
-//   try {
-//     const params = new URLSearchParams()
-//     if (query) params.append('q', query)
-//     if (category) params.append('category', category)
-//
-//     const response = await fetch(`/api/search?${params}`)
-//     const data = await response.json()
-//     return data
-//   } catch (error) {
-//     console.error('검색 실패:', error)
-//     return []
-//   }
-// }
-
-// HARDCODED: 실제 API에서 가져와야 할 매장 데이터
-const stores = [
-  {
-    id: 1,
-    name: "학생식당",
-    category: "restaurant",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.5,
-    reviewCount: 128,
-    distance: "도보 2분",
-    isOpen: true,
-    tags: ["한식", "저렴함", "빠름"],
-    menus: ["김치찌개", "불고기덮밥", "된장찌개", "비빔밥"],
-  },
-  {
-    id: 2,
-    name: "카페 드림",
-    category: "cafe",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.3,
-    reviewCount: 89,
-    distance: "도보 3분",
-    isOpen: true,
-    tags: ["커피", "디저트", "조용함"],
-    menus: ["아메리카노", "카페라떼", "크로와상", "치즈케이크"],
-  },
-  {
-    id: 3,
-    name: "편의점",
-    category: "preorder",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.1,
-    reviewCount: 45,
-    distance: "도보 1분",
-    isOpen: false,
-    tags: ["간편식", "24시간", "다양함"],
-    menus: ["삼각김밥", "컵라면", "샌드위치", "음료수"],
-  },
-  {
-    id: 4,
-    name: "교직원식당",
-    category: "restaurant",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.7,
-    reviewCount: 67,
-    distance: "도보 5분",
-    isOpen: true,
-    tags: ["한식", "정갈함", "넓음"],
-    menus: ["정식", "갈비탕", "냉면", "돈까스"],
-  },
-  {
-    id: 5,
-    name: "스타벅스",
-    category: "cafe",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.4,
-    reviewCount: 156,
-    distance: "도보 4분",
-    isOpen: true,
-    tags: ["브랜드", "스터디", "와이파이"],
-    menus: ["아메리카노", "프라푸치노", "머핀", "쿠키"],
-  },
-  {
-    id: 6,
-    name: "아주굿즈샵",
-    category: "preorder",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.2,
-    reviewCount: 34,
-    distance: "도보 3분",
-    isOpen: true,
-    tags: ["굿즈", "기념품", "학용품"],
-    menus: ["아주대 후드티", "텀블러", "볼펜", "노트"],
-  },
-  {
-    id: 7,
-    name: "투썸플레이스",
-    category: "cafe",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.1,
-    reviewCount: 92,
-    distance: "도보 6분",
-    isOpen: true,
-    tags: ["디저트", "케이크", "브랜드"],
-    menus: ["아메리카노", "생크림케이크", "마카롱", "샐러드"],
-  },
-  {
-    id: 8,
-    name: "기숙사식당",
-    category: "restaurant",
-    image: "/placeholder.svg?height=120&width=200",
-    rating: 4.0,
-    reviewCount: 78,
-    distance: "도보 8분",
-    isOpen: true,
-    tags: ["한식", "저렴함", "기숙사"],
-    menus: ["백반", "라면", "김치볶음밥", "계란말이"],
-  },
-]
-
 const categories = [
   { id: "cafe", name: "카페" },
   { id: "restaurant", name: "식당" },
   { id: "preorder", name: "프리오더" },
 ]
 
-export default function HomePage() {
+function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchBar, setShowSearchBar] = useState(false)
   const [searchResults, setSearchResults] = useState<any[]>([])
-  // TODO: API 연동 - 매장 데이터 상태 관리
-  // const [stores, setStores] = useState([])
-  // const [loading, setLoading] = useState(true)
+  const [stores, setStores] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // TODO: API 연동 - 컴포넌트 마운트 시 매장 데이터 로딩
-  // useEffect(() => {
-  //   const loadStores = async () => {
-  //     setLoading(true)
-  //     const storeData = await fetchStores()
-  //     setStores(storeData)
-  //     setLoading(false)
-  //   }
-  //   loadStores()
-  // }, [])
-
-  // TODO: API 연동 - 검색 로직
-  // useEffect(() => {
-  //   const performSearch = async () => {
-  //     if (searchQuery.trim()) {
-  //       setIsSearching(true)
-  //       const results = await searchStoresAndMenus(searchQuery, selectedCategory)
-  //       setSearchResults(results)
-  //       setIsSearching(false)
-  //     } else {
-  //       setSearchResults([])
-  //     }
-  //   }
-  //
-  //   const debounceTimer = setTimeout(performSearch, 300)
-  //   return () => clearTimeout(debounceTimer)
-  // }, [searchQuery, selectedCategory])
+  // 컴포넌트 마운트 시 매장 데이터 로딩
+  useEffect(() => {
+    const loadStores = async () => {
+      setLoading(true)
+      try {
+        const storeData = await storeAPI.getAllStores()
+        // API 응답을 기존 형태에 맞게 변환
+        const transformedStores = storeData.map((store: any) => ({
+          id: store.id,
+          name: store.storeName,
+          category: "restaurant", // 기본값, 실제로는 API에서 카테고리 정보가 필요
+          image: "/placeholder.svg?height=120&width=200",
+          rating: 4.5, // 기본값, 실제로는 API에서 평점 정보가 필요
+          reviewCount: 0, // 기본값
+          distance: "도보 2분", // 기본값
+          isOpen: true, // 기본값
+          tags: ["한식", "저렴함"], // 기본값
+          menus: [], // 나중에 개별적으로 로드
+        }))
+        setStores(transformedStores)
+      } catch (error) {
+        console.error("매장 데이터 로딩 실패:", error)
+        // 에러 시 빈 배열로 설정
+        setStores([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadStores()
+  }, [])
 
   // 매장명과 메뉴명으로 검색하는 로직
   const performLocalSearch = () => {
@@ -195,14 +69,14 @@ export default function HomePage() {
       .filter((store) => {
         // 매장명으로 검색
         const storeNameMatch = store.name.toLowerCase().includes(query)
-        // 메뉴명으로 검색
-        const menuMatch = store.menus.some((menu) => menu.toLowerCase().includes(query))
+        // 메뉴명으로 검색 (현재는 빈 배열이므로 나중에 구현)
+        const menuMatch = store.menus.some((menu: string) => menu.toLowerCase().includes(query))
 
         return storeNameMatch || menuMatch
       })
       .map((store) => {
         // 매칭된 메뉴들 찾기
-        const matchedMenus = store.menus.filter((menu) => menu.toLowerCase().includes(query))
+        const matchedMenus = store.menus.filter((menu: string) => menu.toLowerCase().includes(query))
 
         return {
           ...store,
@@ -231,7 +105,7 @@ export default function HomePage() {
         return matchesCategory
       })
 
-  // HARDCODED: 카테고리별 한글 제목 매핑
+  // 카테고리별 한글 제목 매핑
   const getCategoryTitle = () => {
     if (searchQuery) {
       return `"${searchQuery}" 검색 결과`
@@ -272,6 +146,17 @@ export default function HomePage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-[#0051a2] mb-4">아주오더</div>
+          <div className="text-gray-500">매장 정보를 불러오는 중...</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -286,7 +171,6 @@ export default function HomePage() {
               <Link href="/cart">
                 <div className="relative">
                   <ShoppingCart className="h-6 w-6" />
-                  {/* HARDCODED: 장바구니 아이템 수 */}
                   <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 text-xs bg-red-500">2</Badge>
                 </div>
               </Link>
@@ -477,5 +361,13 @@ export default function HomePage() {
         </div>
       </nav>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <AuthGuard>
+      <HomePage />
+    </AuthGuard>
   )
 }

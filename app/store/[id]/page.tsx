@@ -1,155 +1,83 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Star, Heart, Plus, Minus, ShoppingCart } from "lucide-react"
 import Link from "next/link"
-
-// TODO: API 연동 - 매장 상세 정보 및 메뉴 데이터 가져오기
-// const fetchStoreDetails = async (storeId: string) => {
-//   try {
-//     const response = await fetch(`/api/stores/${storeId}`)
-//     return await response.json()
-//   } catch (error) {
-//     console.error('매장 정보 로딩 실패:', error)
-//     return null
-//   }
-// }
-
-// const fetchMenuItems = async (storeId: string) => {
-//   try {
-//     const response = await fetch(`/api/stores/${storeId}/menu`)
-//     return await response.json()
-//   } catch (error) {
-//     console.error('메뉴 데이터 로딩 실패:', error)
-//     return []
-//   }
-// }
-
-// const updateFavorite = async (menuId: number, isFavorite: boolean) => {
-//   try {
-//     await fetch(`/api/menu/${menuId}/favorite`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({ isFavorite })
-//     })
-//   } catch (error) {
-//     console.error('즐겨찾기 업데이트 실패:', error)
-//   }
-// }
-
-// const addToCartAPI = async (menuId: number, quantity: number) => {
-//   try {
-//     await fetch('/api/cart', {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({ menuId, quantity })
-//     })
-//   } catch (error) {
-//     console.error('장바구니 추가 실패:', error)
-//   }
-// }
-
-const storeData = {
-  id: 1,
-  name: "학생식당",
-  image: "/placeholder.svg?height=200&width=400",
-  rating: 4.5,
-  reviewCount: 128,
-  description: "신선한 재료로 만든 건강한 한식",
-  openTime: "11:00 - 20:00",
-  phone: "031-219-1234",
-}
-
-const menuCategories = [
-  { id: "best", name: "베스트 메뉴", icon: "🏆" },
-  { id: "rice", name: "밥류", icon: "🍚" },
-  { id: "noodle", name: "면류", icon: "🍜" },
-  { id: "side", name: "사이드", icon: "🥗" },
-]
-
-const menuItems = [
-  {
-    id: 1,
-    name: "김치찌개",
-    price: 4500,
-    image: "/placeholder.svg?height=80&width=80",
-    description: "매콤한 김치찌개",
-    category: "best",
-    isFavorite: true,
-    tags: ["매운맛", "든든함", "따뜻함"],
-    likes: 89,
-    isPopular: true,
-  },
-  {
-    id: 2,
-    name: "불고기덮밥",
-    price: 5000,
-    image: "/placeholder.svg?height=80&width=80",
-    description: "달콤한 불고기덮밥",
-    category: "rice",
-    isFavorite: false,
-    tags: ["달콤함", "든든함", "고기"],
-    likes: 67,
-    isPopular: true,
-  },
-  {
-    id: 3,
-    name: "라면",
-    price: 3000,
-    image: "/placeholder.svg?height=80&width=80",
-    description: "얼큰한 라면",
-    category: "noodle",
-    isFavorite: false,
-    tags: ["매운맛", "간단함", "빠름"],
-    likes: 45,
-    isPopular: false,
-  },
-  {
-    id: 4,
-    name: "계란말이",
-    price: 2000,
-    image: "/placeholder.svg?height=80&width=80",
-    description: "부드러운 계란말이",
-    category: "side",
-    isFavorite: true,
-    tags: ["부드러움", "담백함", "간단함"],
-    likes: 34,
-    isPopular: false,
-  },
-]
+import { storeAPI } from "@/lib/auth"
 
 export default function StorePage({ params }: { params: { id: string } }) {
-  // TODO: API 연동 - 실제 데이터 상태 관리
-  // const [storeData, setStoreData] = useState(null)
-  // const [menuItems, setMenuItems] = useState([])
-  // const [loading, setLoading] = useState(true)
-
-  // TODO: API 연동 - 데이터 로딩
-  // useEffect(() => {
-  //   const loadData = async () => {
-  //     setLoading(true)
-  //     const [store, menu] = await Promise.all([
-  //       fetchStoreDetails(params.id),
-  //       fetchMenuItems(params.id)
-  //     ])
-  //     setStoreData(store)
-  //     setMenuItems(menu)
-  //     setLoading(false)
-  //   }
-  //   loadData()
-  // }, [params.id])
-
-  const [selectedCategory, setSelectedCategory] = useState("best")
+  const [storeData, setStoreData] = useState<any>(null)
+  const [menuItems, setMenuItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedCategory, setSelectedCategory] = useState("all")
   const [cart, setCart] = useState<{ [key: number]: number }>({})
-  const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({
-    1: true,
-    4: true,
-  })
+  const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({})
+
+  // 데이터 로딩
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true)
+      try {
+        const storeId = Number.parseInt(params.id)
+        const menuData = await storeAPI.getStoreMenus(storeId)
+
+        // 임시 매장 데이터 (실제로는 매장 상세 정보 API가 필요)
+        setStoreData({
+          id: storeId,
+          name: "매장명",
+          image: "/placeholder.svg?height=200&width=400",
+          rating: 4.5,
+          reviewCount: 128,
+          description: "맛있는 음식을 제공하는 매장입니다",
+          openTime: "11:00 - 20:00",
+          phone: "031-219-1234",
+        })
+
+        // API 응답을 기존 형태에 맞게 변환
+        const transformedMenus = menuData.map((menu: any) => ({
+          id: menu.id,
+          name: menu.menuName,
+          price: menu.price,
+          image: "/placeholder.svg?height=80&width=80",
+          description: menu.description || "맛있는 메뉴입니다",
+          category: "all",
+          isFavorite: false,
+          tags: ["맛있음", "추천"],
+          likes: Math.floor(Math.random() * 100),
+          isPopular: Math.random() > 0.5,
+          amount: menu.amount,
+        }))
+
+        setMenuItems(transformedMenus)
+      } catch (error) {
+        console.error("데이터 로딩 실패:", error)
+        setStoreData({
+          id: Number.parseInt(params.id),
+          name: "매장을 찾을 수 없습니다",
+          image: "/placeholder.svg?height=200&width=400",
+          rating: 0,
+          reviewCount: 0,
+          description: "",
+          openTime: "",
+          phone: "",
+        })
+        setMenuItems([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [params.id])
+
+  const menuCategories = [
+    { id: "all", name: "전체 메뉴", icon: "🍽️" },
+    { id: "popular", name: "인기 메뉴", icon: "🏆" },
+  ]
 
   const filteredMenus = menuItems.filter((item) =>
-    selectedCategory === "best" ? item.isPopular : item.category === selectedCategory,
+    selectedCategory === "all" ? true : selectedCategory === "popular" ? item.isPopular : true,
   )
 
   const addToCart = (itemId: number) => {
@@ -157,8 +85,6 @@ export default function StorePage({ params }: { params: { id: string } }) {
       ...prev,
       [itemId]: (prev[itemId] || 0) + 1,
     }))
-    // TODO: API 연동 - 장바구니에 추가
-    // addToCartAPI(itemId, 1)
   }
 
   const removeFromCart = (itemId: number) => {
@@ -173,11 +99,19 @@ export default function StorePage({ params }: { params: { id: string } }) {
       ...prev,
       [itemId]: !prev[itemId],
     }))
-    // TODO: API 연동 - 즐겨찾기 상태 업데이트
-    // updateFavorite(itemId, !favorites[itemId])
   }
 
   const totalItems = Object.values(cart).reduce((sum, count) => sum + count, 0)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">메뉴를 불러오는 중...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -190,7 +124,7 @@ export default function StorePage({ params }: { params: { id: string } }) {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <h1 className="font-medium">{storeData.name}</h1>
+            <h1 className="font-medium">{storeData?.name}</h1>
             <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
@@ -206,20 +140,24 @@ export default function StorePage({ params }: { params: { id: string } }) {
       <div className="max-w-md mx-auto">
         {/* Store Info */}
         <div className="bg-white">
-          <img src={storeData.image || "/placeholder.svg"} alt={storeData.name} className="w-full h-48 object-cover" />
+          <img
+            src={storeData?.image || "/placeholder.svg"}
+            alt={storeData?.name}
+            className="w-full h-48 object-cover"
+          />
           <div className="p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">{storeData.name}</h2>
+              <h2 className="text-xl font-bold">{storeData?.name}</h2>
               <div className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-medium">{storeData.rating}</span>
-                <span className="text-gray-500">({storeData.reviewCount})</span>
+                <span className="font-medium">{storeData?.rating}</span>
+                <span className="text-gray-500">({storeData?.reviewCount})</span>
               </div>
             </div>
-            <p className="text-gray-600 mt-1">{storeData.description}</p>
+            <p className="text-gray-600 mt-1">{storeData?.description}</p>
             <div className="flex gap-4 mt-2 text-sm text-gray-500">
-              <span>⏰ {storeData.openTime}</span>
-              <span>📞 {storeData.phone}</span>
+              <span>⏰ {storeData?.openTime}</span>
+              <span>📞 {storeData?.phone}</span>
             </div>
           </div>
         </div>
@@ -245,75 +183,95 @@ export default function StorePage({ params }: { params: { id: string } }) {
         {/* Menu List */}
         <div className="bg-white mt-2">
           <div className="divide-y">
-            {filteredMenus.map((item) => (
-              <div key={item.id} className="p-4">
-                <div className="flex gap-3">
-                  <img
-                    src={item.image || "/placeholder.svg"}
-                    alt={item.name}
-                    className="w-20 h-20 rounded-lg object-cover"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">{item.name}</h3>
-                          {item.isPopular && (
-                            <Badge variant="destructive" className="text-xs">
-                              인기
-                            </Badge>
-                          )}
+            {filteredMenus.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="text-4xl mb-4">🍽️</div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">메뉴가 없습니다</h3>
+                <p className="text-gray-500">아직 등록된 메뉴가 없습니다</p>
+              </div>
+            ) : (
+              filteredMenus.map((item) => (
+                <div key={item.id} className="p-4">
+                  <div className="flex gap-3">
+                    <img
+                      src={item.image || "/placeholder.svg"}
+                      alt={item.name}
+                      className="w-20 h-20 rounded-lg object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium">{item.name}</h3>
+                            {item.isPopular && (
+                              <Badge variant="destructive" className="text-xs">
+                                인기
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                          <p className="font-bold text-lg mt-1">{item.price.toLocaleString()}원</p>
+                          {item.amount > 0 && <p className="text-sm text-gray-500">재고: {item.amount}개</p>}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-                        <p className="font-bold text-lg mt-1">{item.price.toLocaleString()}원</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleFavorite(item.id)}
-                        className="text-gray-400 hover:text-red-500"
-                      >
-                        <Heart className={`h-5 w-5 ${favorites[item.id] ? "fill-red-500 text-red-500" : ""}`} />
-                      </Button>
-                    </div>
-
-                    {/* Tags */}
-                    <div className="flex gap-1 mt-2">
-                      {item.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      <div className="flex items-center gap-1 ml-auto">
-                        <span className="text-xs text-gray-500">👍 {item.likes}</span>
-                      </div>
-                    </div>
-
-                    {/* Add to Cart */}
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-2">
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          onClick={() => removeFromCart(item.id)}
-                          disabled={!cart[item.id]}
+                          onClick={() => toggleFavorite(item.id)}
+                          className="text-gray-400 hover:text-red-500"
                         >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="w-8 text-center font-medium">{cart[item.id] || 0}</span>
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => addToCart(item.id)}>
-                          <Plus className="h-4 w-4" />
+                          <Heart className={`h-5 w-5 ${favorites[item.id] ? "fill-red-500 text-red-500" : ""}`} />
                         </Button>
                       </div>
-                      <Button size="sm" onClick={() => addToCart(item.id)} className="ml-2">
-                        담기
-                      </Button>
+
+                      {/* Tags */}
+                      <div className="flex gap-1 mt-2">
+                        {item.tags.map((tag: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                        <div className="flex items-center gap-1 ml-auto">
+                          <span className="text-xs text-gray-500">👍 {item.likes}</span>
+                        </div>
+                      </div>
+
+                      {/* Add to Cart */}
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => removeFromCart(item.id)}
+                            disabled={!cart[item.id]}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-8 text-center font-medium">{cart[item.id] || 0}</span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => addToCart(item.id)}
+                            disabled={item.amount === 0}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => addToCart(item.id)}
+                          className="ml-2"
+                          disabled={item.amount === 0}
+                        >
+                          {item.amount === 0 ? "품절" : "담기"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

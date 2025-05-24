@@ -1,62 +1,11 @@
 "use client"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, User, Bell, CreditCard, HelpCircle, LogOut, ChevronRight } from "lucide-react"
 import Link from "next/link"
-
-// TODO: API 연동 - 사용자 정보 가져오기
-// const fetchUserProfile = async () => {
-//   try {
-//     const response = await fetch('/api/user/profile', {
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//     return await response.json()
-//   } catch (error) {
-//     console.error('프로필 로딩 실패:', error)
-//     return null
-//   }
-// }
-
-// const fetchUserStats = async () => {
-//   try {
-//     const response = await fetch('/api/user/stats', {
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//     return await response.json()
-//   } catch (error) {
-//     console.error('통계 로딩 실패:', error)
-//     return { totalOrders: 0, favoriteStore: '없음' }
-//   }
-// }
-
-// const logout = async () => {
-//   try {
-//     await fetch('/api/auth/logout', {
-//       method: 'POST',
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//     localStorage.removeItem('token')
-//     localStorage.removeItem('user')
-//     window.location.href = '/auth/login'
-//   } catch (error) {
-//     console.error('로그아웃 실패:', error)
-//   }
-// }
-
-const userData = {
-  name: "홍길동",
-  email: "student@ajou.ac.kr",
-  studentId: "202012345",
-  totalOrders: 24,
-  favoriteStore: "학생식당",
-}
+import { authStorage, authAPI, type UserDto } from "@/lib/auth"
 
 const menuItems = [
   {
@@ -86,23 +35,66 @@ const menuItems = [
 ]
 
 export default function ProfilePage() {
-  // TODO: API 연동 - 사용자 데이터 상태 관리
-  // const [userData, setUserData] = useState(null)
-  // const [loading, setLoading] = useState(true)
+  const [userData, setUserData] = useState<UserDto | null>(null)
+  const [userStats, setUserStats] = useState({
+    totalOrders: 0,
+    favoriteStore: "학생식당",
+  })
+  const [loading, setLoading] = useState(true)
 
-  // TODO: API 연동 - 사용자 데이터 로딩
-  // useEffect(() => {
-  //   const loadUserData = async () => {
-  //     setLoading(true)
-  //     const [profile, stats] = await Promise.all([
-  //       fetchUserProfile(),
-  //       fetchUserStats()
-  //     ])
-  //     setUserData({ ...profile, ...stats })
-  //     setLoading(false)
-  //   }
-  //   loadUserData()
-  // }, [])
+  useEffect(() => {
+    const loadUserData = async () => {
+      setLoading(true)
+      try {
+        const user = authStorage.getUser()
+        if (user) {
+          // 최신 사용자 정보를 API에서 가져오기
+          const updatedUser = await authAPI.getUserInfo(user.email)
+          setUserData(updatedUser)
+          authStorage.setUser(updatedUser) // 로컬 스토리지 업데이트
+        } else {
+          // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
+          window.location.href = "/auth/login"
+        }
+      } catch (error) {
+        console.error("사용자 정보 로딩 실패:", error)
+        // 에러 시 로컬 스토리지의 정보 사용
+        const user = authStorage.getUser()
+        setUserData(user)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadUserData()
+  }, [])
+
+  const handleLogout = () => {
+    if (confirm("정말 로그아웃 하시겠습니까?")) {
+      authStorage.logout()
+      window.location.href = "/auth/login"
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">사용자 정보를 불러오는 중...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!userData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">사용자 정보를 찾을 수 없습니다</div>
+          <Button onClick={() => (window.location.href = "/auth/login")}>로그인하기</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -131,7 +123,9 @@ export default function ProfilePage() {
               <div className="flex-1">
                 <h2 className="text-xl font-bold">{userData.name}</h2>
                 <p className="text-gray-600">{userData.email}</p>
-                <p className="text-sm text-gray-500">학번: {userData.studentId}</p>
+                <p className="text-sm text-gray-500">학번: {userData.studentNumber}</p>
+                <p className="text-sm text-gray-500">학과: {userData.department}</p>
+                <p className="text-sm text-gray-500">역할: {userData.role}</p>
               </div>
             </div>
 
@@ -139,11 +133,11 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
-                <p className="text-2xl font-bold text-blue-600">{userData.totalOrders}</p>
+                <p className="text-2xl font-bold text-blue-600">{userStats.totalOrders}</p>
                 <p className="text-sm text-gray-600">총 주문수</p>
               </div>
               <div>
-                <p className="text-lg font-medium">{userData.favoriteStore}</p>
+                <p className="text-lg font-medium">{userStats.favoriteStore}</p>
                 <p className="text-sm text-gray-600">최애 매장</p>
               </div>
             </div>
@@ -174,7 +168,7 @@ export default function ProfilePage() {
         <Card className="mt-4 mx-4">
           <CardContent className="p-0">
             <button
-              // onClick={logout}
+              onClick={handleLogout}
               className="w-full flex items-center p-4 hover:bg-gray-50 transition-colors text-red-600"
             >
               <LogOut className="h-5 w-5 mr-3" />

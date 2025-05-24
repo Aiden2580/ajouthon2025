@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, CreditCard, Smartphone } from "lucide-react"
 import Link from "next/link"
+import { orderAPI, authStorage } from "@/lib/auth"
 
 const orderItems = [
   { name: "김치찌개", quantity: 2, price: 4500 },
@@ -24,46 +25,46 @@ const paymentMethods = [
 export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState("card")
   const [specialRequest, setSpecialRequest] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
   const totalPrice = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const deliveryFee = 1000
   const finalPrice = totalPrice + deliveryFee
 
   const handlePayment = async () => {
-    // TODO: API 연동 - 결제 처리
-    // try {
-    //   const orderData = {
-    //     items: orderItems,
-    //     paymentMethod,
-    //     specialRequest,
-    //     totalAmount: finalPrice
-    //   }
-    //
-    //   const response = await fetch('/api/orders', {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       'Authorization': `Bearer ${localStorage.getItem('token')}`
-    //     },
-    //     body: JSON.stringify(orderData)
-    //   })
-    //
-    //   if (response.ok) {
-    //     const result = await response.json()
-    //     // 결제 성공 시 주문 완료 페이지로 이동
-    //     window.location.href = `/order-complete/${result.orderId}`
-    //   } else {
-    //     const error = await response.json()
-    //     alert(error.message || '결제에 실패했습니다.')
-    //   }
-    // } catch (error) {
-    //   console.error('결제 오류:', error)
-    //   alert('결제 처리 중 오류가 발생했습니다.')
-    // }
+    setIsLoading(true)
 
-    // 임시 결제 로직
-    console.log("Payment:", { paymentMethod, specialRequest, finalPrice })
-    alert("결제가 완료되었습니다!")
+    try {
+      const user = authStorage.getUser()
+      if (!user) {
+        alert("로그인이 필요합니다.")
+        window.location.href = "/auth/login"
+        return
+      }
+
+      // 각 메뉴에 대해 주문 생성 (현재 API는 한 번에 하나의 메뉴만 주문 가능)
+      const orders = []
+      for (const item of orderItems) {
+        for (let i = 0; i < item.quantity; i++) {
+          const order = await orderAPI.createOrder(
+            user.id,
+            1, // 임시 storeId, 실제로는 장바구니에서 가져와야 함
+            item.name,
+          )
+          orders.push(order)
+        }
+      }
+
+      // 결제 성공 시 주문 완료 페이지로 이동
+      if (orders.length > 0) {
+        window.location.href = `/order-complete/${orders[0].id}`
+      }
+    } catch (error) {
+      console.error("결제 오류:", error)
+      alert("결제 처리 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -158,8 +159,8 @@ export default function CheckoutPage() {
         {/* Payment Button */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
           <div className="max-w-md mx-auto p-4">
-            <Button onClick={handlePayment} className="w-full" size="lg">
-              {finalPrice.toLocaleString()}원 결제하기
+            <Button onClick={handlePayment} className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? "결제 처리 중..." : `${finalPrice.toLocaleString()}원 결제하기`}
             </Button>
           </div>
         </div>
