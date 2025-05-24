@@ -166,7 +166,7 @@ function BusinessDashboard() {
                 size="sm"
                 onClick={refreshOrders}
                 disabled={isRefreshing}
-                className="text-white border-white hover:bg-white/10"
+                className="text-black border-white hover:bg-white/10"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
                 새로고침

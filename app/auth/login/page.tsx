@@ -23,10 +23,10 @@ export default function LoginPage() {
     setError("")
 
     // 이메일 유효성 검사
-    if (!validateAjouEmail(email)) {
-      setError("아주대학교 이메일(@ajou.ac.kr)을 사용해주세요.")
-      return
-    }
+    // if (!validateAjouEmail(email)) {
+    //   setError("아주대학교 이메일(@ajou.ac.kr)을 사용해주세요.")
+    //   return
+    // }
 
     if (!password) {
       setError("비밀번호를 입력해주세요.")

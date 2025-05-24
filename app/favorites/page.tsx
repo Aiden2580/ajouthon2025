@@ -130,11 +130,14 @@ export default function FavoritesPage() {
               {favorites.map((item) => (
                 <div key={item.id} className="p-4">
                   <div className="flex gap-3">
-                    <img
+                    {/* <img
                       src={item.image || "/placeholder.svg"}
                       alt={item.name}
                       className="w-20 h-20 rounded-lg object-cover"
-                    />
+                    /> */}
+                    <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-6xl">
+  ☕️
+</div>
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
                         <div>
