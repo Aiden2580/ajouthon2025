@@ -32,25 +32,43 @@ function BusinessMenuPage() {
     amount: 0,
     description: "",
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const loadMenuData = async () => {
       setLoading(true)
       try {
         const user = authStorage.getUser()
+        console.log("메뉴 관리 - 현재 사용자:", user)
+
         if (user) {
           // 가게 주인의 매장 정보 조회
+          console.log("매장 정보 조회 시작...")
           const store = await storeAPI.findStoreByOwnerEmail(user.email)
+          console.log("조회된 매장:", store)
+
           if (store) {
             setStoreData(store)
 
             // 매장의 메뉴 조회
-            const menus = await storeAPI.getStoreMenus(store.id)
-            setMenuItems(menus)
+            console.log("메뉴 정보 조회 시작...")
+            try {
+              const menus = await storeAPI.getStoreMenus(store.id)
+              console.log("조회된 메뉴:", menus)
+              setMenuItems(menus)
+            } catch (menuError) {
+              console.error("메뉴 정보 로딩 실패:", menuError)
+              setMenuItems([])
+              alert("메뉴 정보를 불러오는데 실패했습니다: " + menuError.message)
+            }
+          } else {
+            console.error("매장 정보를 찾을 수 없습니다.")
+            alert("매장 정보를 찾을 수 없습니다. 매장을 먼저 등록해주세요.")
           }
         }
       } catch (error) {
         console.error("메뉴 데이터 로딩 실패:", error)
+        alert("메뉴 데이터를 불러오는데 실패했습니다: " + error.message)
       } finally {
         setLoading(false)
       }
@@ -70,57 +88,103 @@ function BusinessMenuPage() {
     setEditingMenu(null)
   }
 
+  const refreshMenuList = async () => {
+    if (storeData) {
+      try {
+        const menus = await storeAPI.getStoreMenus(storeData.id)
+        setMenuItems(menus)
+      } catch (error) {
+        console.error("메뉴 목록 새로고침 실패:", error)
+      }
+    }
+  }
+
   const handleAddMenu = async () => {
     if (!storeData) return
 
+    if (!formData.menuName.trim()) {
+      alert("메뉴명을 입력해주세요.")
+      return
+    }
+
+    if (formData.price <= 0) {
+      alert("올바른 가격을 입력해주세요.")
+      return
+    }
+
+    setIsSubmitting(true)
+
     try {
-      const newMenu = await businessMenuAPI.addMenu(storeData.id, formData)
-      setMenuItems((prev) => [...prev, newMenu])
+      await businessMenuAPI.addMenu(storeData.id, formData)
+      await refreshMenuList()
       resetForm()
       alert("메뉴가 추가되었습니다!")
     } catch (error) {
       console.error("메뉴 추가 실패:", error)
-      alert("메뉴 추가에 실패했습니다.")
+      alert("메뉴 추가에 실패했습니다: " + (error instanceof Error ? error.message : "알 수 없는 오류"))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleEditMenu = async () => {
-    if (!editingMenu) return
+    if (!editingMenu || !storeData) return
+
+    if (!formData.menuName.trim()) {
+      alert("메뉴명을 입력해주세요.")
+      return
+    }
+
+    if (formData.price <= 0) {
+      alert("올바른 가격을 입력해주세요.")
+      return
+    }
+
+    setIsSubmitting(true)
 
     try {
-      const updatedMenu = await businessMenuAPI.updateMenu(editingMenu.id, formData)
-      setMenuItems((prev) => prev.map((menu) => (menu.id === editingMenu.id ? { ...menu, ...formData } : menu)))
+      await businessMenuAPI.updateMenu(storeData.id, editingMenu.menuName, formData)
+      await refreshMenuList()
       resetForm()
       alert("메뉴가 수정되었습니다!")
     } catch (error) {
       console.error("메뉴 수정 실패:", error)
-      alert("메뉴 수정에 실패했습니다.")
+      alert("메뉴 수정에 실패했습니다: " + (error instanceof Error ? error.message : "알 수 없는 오류"))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const handleDeleteMenu = async (menuId: number) => {
-    if (!confirm("정말 이 메뉴를 삭제하시겠습니까?")) return
+  const handleDeleteMenu = async (menu: MenuDto) => {
+    if (!storeData) return
+
+    if (!confirm(`정말 "${menu.menuName}" 메뉴를 삭제하시겠습니까?`)) return
 
     try {
-      await businessMenuAPI.deleteMenu(menuId)
-      setMenuItems((prev) => prev.filter((menu) => menu.id !== menuId))
+      await businessMenuAPI.deleteMenu(storeData.id, menu.menuName)
+      await refreshMenuList()
       alert("메뉴가 삭제되었습니다!")
     } catch (error) {
       console.error("메뉴 삭제 실패:", error)
-      alert("메뉴 삭제에 실패했습니다.")
+      alert("메뉴 삭제에 실패했습니다: " + (error instanceof Error ? error.message : "알 수 없는 오류"))
     }
   }
 
   const handleToggleAvailability = async (menu: MenuDto) => {
+    if (!storeData) return
+
     const newAmount = menu.amount > 0 ? 0 : 10 // 품절 <-> 재개
+    const action = newAmount > 0 ? "재개" : "품절 처리"
+
+    if (!confirm(`"${menu.menuName}" 메뉴를 ${action}하시겠습니까?`)) return
 
     try {
-      await businessMenuAPI.toggleMenuAvailability(menu.id, newAmount)
-      setMenuItems((prev) => prev.map((item) => (item.id === menu.id ? { ...item, amount: newAmount } : item)))
-      alert(newAmount > 0 ? "메뉴 판매를 재개했습니다!" : "메뉴를 품절 처리했습니다!")
+      await businessMenuAPI.toggleMenuAvailability(storeData.id, menu.menuName, menu, newAmount)
+      await refreshMenuList()
+      alert(`메뉴 ${action}가 완료되었습니다!`)
     } catch (error) {
       console.error("메뉴 상태 변경 실패:", error)
-      alert("메뉴 상태 변경에 실패했습니다.")
+      alert("메뉴 상태 변경에 실패했습니다: " + (error instanceof Error ? error.message : "알 수 없는 오류"))
     }
   }
 
@@ -159,7 +223,7 @@ function BusinessMenuPage() {
               </Link>
               <h1 className="font-medium ml-2">메뉴 관리</h1>
             </div>
-            <Button onClick={() => setShowAddForm(true)} disabled={showAddForm}>
+            <Button onClick={() => setShowAddForm(true)} disabled={showAddForm || isSubmitting}>
               <Plus className="h-4 w-4 mr-2" />
               메뉴 추가
             </Button>
@@ -186,22 +250,25 @@ function BusinessMenuPage() {
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="menuName">메뉴명</Label>
+                  <Label htmlFor="menuName">메뉴명 *</Label>
                   <Input
                     id="menuName"
                     value={formData.menuName}
                     onChange={(e) => setFormData((prev) => ({ ...prev, menuName: e.target.value }))}
                     placeholder="메뉴명을 입력하세요"
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="price">가격</Label>
+                  <Label htmlFor="price">가격 *</Label>
                   <Input
                     id="price"
                     type="number"
+                    min="0"
                     value={formData.price}
                     onChange={(e) => setFormData((prev) => ({ ...prev, price: Number(e.target.value) }))}
                     placeholder="가격을 입력하세요"
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -209,9 +276,11 @@ function BusinessMenuPage() {
                   <Input
                     id="amount"
                     type="number"
+                    min="0"
                     value={formData.amount}
                     onChange={(e) => setFormData((prev) => ({ ...prev, amount: Number(e.target.value) }))}
                     placeholder="재고 수량을 입력하세요"
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -222,18 +291,19 @@ function BusinessMenuPage() {
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                     placeholder="메뉴 설명을 입력하세요"
                     className="min-h-[80px]"
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
                 <Button
                   onClick={editingMenu ? handleEditMenu : handleAddMenu}
-                  disabled={!formData.menuName || formData.price <= 0}
+                  disabled={!formData.menuName.trim() || formData.price <= 0 || isSubmitting}
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {editingMenu ? "수정" : "추가"}
+                  {isSubmitting ? "처리 중..." : editingMenu ? "수정" : "추가"}
                 </Button>
-                <Button variant="outline" onClick={resetForm}>
+                <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>
                   <X className="h-4 w-4 mr-2" />
                   취소
                 </Button>
@@ -250,7 +320,7 @@ function BusinessMenuPage() {
                 <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">메뉴가 없습니다</h3>
                 <p className="text-gray-500 mb-4">첫 번째 메뉴를 추가해보세요!</p>
-                <Button onClick={() => setShowAddForm(true)}>
+                <Button onClick={() => setShowAddForm(true)} disabled={showAddForm}>
                   <Plus className="h-4 w-4 mr-2" />
                   메뉴 추가하기
                 </Button>
@@ -289,7 +359,12 @@ function BusinessMenuPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleToggleAvailability(menu)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleAvailability(menu)}
+                        disabled={isSubmitting}
+                      >
                         {menu.amount > 0 ? (
                           <>
                             <PackageX className="h-4 w-4 mr-1" />
@@ -302,15 +377,16 @@ function BusinessMenuPage() {
                           </>
                         )}
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => startEdit(menu)}>
+                      <Button variant="outline" size="sm" onClick={() => startEdit(menu)} disabled={isSubmitting}>
                         <Edit className="h-4 w-4 mr-1" />
                         수정
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDeleteMenu(menu.id)}
+                        onClick={() => handleDeleteMenu(menu)}
                         className="text-red-600 hover:text-red-700"
+                        disabled={isSubmitting}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         삭제

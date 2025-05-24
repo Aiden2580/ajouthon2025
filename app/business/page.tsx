@@ -27,41 +27,65 @@ function BusinessDashboard() {
       setLoading(true)
       try {
         const user = authStorage.getUser()
+        console.log("현재 사용자:", user)
+
         if (user) {
           setUserData(user)
 
           // 가게 주인의 매장 정보 조회
+          console.log("매장 정보 조회 시작...")
           const store = await storeAPI.findStoreByOwnerEmail(user.email)
+          console.log("조회된 매장:", store)
+
           if (store) {
             setStoreData(store)
 
             // 매장의 최근 주문 조회
-            const orders = await orderAPI.getStoreOrders(store.id)
-            setRecentOrders(orders.slice(0, 5)) // 최근 5개만
+            console.log("주문 정보 조회 시작...")
+            try {
+              const orders = await orderAPI.getStoreOrders(store.id)
+              console.log("조회된 주문:", orders)
+              setRecentOrders(orders.slice(0, 5)) // 최근 5개만
 
-            // 메뉴 개수 조회
-            const menus = await storeAPI.getStoreMenus(store.id)
+              // 메뉴 개수 조회
+              console.log("메뉴 정보 조회 시작...")
+              const menus = await storeAPI.getStoreMenus(store.id)
+              console.log("조회된 메뉴:", menus)
 
-            // 통계 계산
-            const pendingCount = orders.filter((order) => order.status === "PENDING").length
-            const todayRevenue = orders
-              .filter((order) => {
-                const orderDate = new Date(order.createdAt)
-                const today = new Date()
-                return orderDate.toDateString() === today.toDateString()
+              // 통계 계산
+              const pendingCount = orders.filter((order) => order.status === "PENDING").length
+              const todayRevenue = orders
+                .filter((order) => {
+                  const orderDate = new Date(order.createdAt)
+                  const today = new Date()
+                  return orderDate.toDateString() === today.toDateString()
+                })
+                .reduce((sum, order) => sum + order.price, 0)
+
+              setStats({
+                totalOrders: orders.length,
+                pendingOrders: pendingCount,
+                todayRevenue,
+                menuCount: menus.length,
               })
-              .reduce((sum, order) => sum + order.price, 0)
-
-            setStats({
-              totalOrders: orders.length,
-              pendingOrders: pendingCount,
-              todayRevenue,
-              menuCount: menus.length,
-            })
+            } catch (orderError) {
+              console.error("주문/메뉴 정보 로딩 실패:", orderError)
+              // 주문/메뉴 로딩 실패해도 매장 정보는 표시
+              setStats({
+                totalOrders: 0,
+                pendingOrders: 0,
+                todayRevenue: 0,
+                menuCount: 0,
+              })
+            }
+          } else {
+            console.error("매장 정보를 찾을 수 없습니다.")
+            alert("매장 정보를 찾을 수 없습니다. 매장을 먼저 등록해주세요.")
           }
         }
       } catch (error) {
         console.error("대시보드 데이터 로딩 실패:", error)
+        alert("대시보드 데이터를 불러오는데 실패했습니다: " + error.message)
       } finally {
         setLoading(false)
       }
@@ -214,7 +238,7 @@ function BusinessDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 mb-4">들어온 주문을 확인하고 처리 상태를 변경하세요.</p>
+              <p className="text-gray-600 mb-4">��어온 주문을 확인하고 처리 상태를 변경하세요.</p>
               <Link href="/business/orders">
                 <Button className="w-full">주문 관리하기</Button>
               </Link>

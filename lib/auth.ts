@@ -39,16 +39,14 @@ export interface OrderDto {
   userId: number
   storeId: number
   price: number
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED"
+  status: "PENDING" | "COMPLETED"
   createdAt: string
   lastUpdatedAt: string
 }
 
-// 가게 주인용 주문 정보 (확장된 정보 포함)
+// 가게 주인용 주문 정보는 기본 OrderDto와 동일하게 사용
 export interface BusinessOrderDto extends OrderDto {
-  userName?: string
-  userEmail?: string
-  menuName?: string
+  // 추가 정보가 필요하면 별도 API로 조회
 }
 
 // 실제 백엔드 API URL
@@ -296,22 +294,7 @@ export const storeAPI = {
 
   // 가게 주인의 매장 찾기 (이메일 기반)
   findStoreByOwnerEmail: async (email: string): Promise<StoreDto | null> => {
-    try {
-      // TODO: 실제 API에서는 가게 주인의 이메일로 매장을 찾는 API가 필요
-      // 현재는 임시로 매장명에 이메일이 포함된 것으로 찾기
-      const stores = await storeAPI.getAllStores()
-
-      // 임시: 이메일의 첫 부분을 매장명으로 매칭 (예: test@ajou.ac.kr -> test 매장)
-      const emailPrefix = email.split("@")[0]
-      const store = stores.find(
-        (store) => store.storeName.toLowerCase().includes(emailPrefix.toLowerCase()) || store.id === 1, // 기본적으로 첫 번째 매장을 할당
-      )
-
-      return store || stores[0] || null // 매칭되는 매장이 없으면 첫 번째 매장 반환
-    } catch (error) {
-      console.error("가게 주인 매장 찾기 에러:", error)
-      return null
-    }
+    return await businessStoreAPI.findStoreByOwnerEmail(email)
   },
 }
 
@@ -404,41 +387,23 @@ export const orderAPI = {
     }
   },
 
-  // 매장별 주문 내역 조회 (가게 주인용)
+  // 매장별 주문 내역 조회 (가게 주인용) - 실제 API 연동 필요
   getStoreOrders: async (storeId: number): Promise<BusinessOrderDto[]> => {
     try {
-      // TODO: 실제 API 구현 필요
-      console.log("매장 주문 내역 조회 (미구현):", storeId)
+      console.log("매장 주문 내역 조회:", storeId)
 
-      // 임시 데이터 반환 (실제로는 API에서 가져와야 함)
-      const mockOrders: BusinessOrderDto[] = [
-        {
-          id: 1,
-          userId: 1,
-          storeId: storeId,
-          price: 4500,
-          status: "PENDING",
-          createdAt: new Date().toISOString(),
-          lastUpdatedAt: new Date().toISOString(),
-          userName: "홍길동",
-          userEmail: "student@ajou.ac.kr",
-          menuName: "김치찌개",
-        },
-        {
-          id: 2,
-          userId: 2,
-          storeId: storeId,
-          price: 5000,
-          status: "CONFIRMED",
-          createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          lastUpdatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          userName: "김철수",
-          userEmail: "student2@ajou.ac.kr",
-          menuName: "불고기덮밥",
-        },
-      ]
+      // TODO: 실제 매장별 주문 조회 API 엔드포인트 필요
+      // 현재는 모든 주문을 조회할 수 있는 API가 없으므로 임시 구현
 
-      return mockOrders
+      // 임시로 빈 배열 반환하되, 실제 구현 시 아래와 같이 호출
+      // const response = await fetch(`${API_BASE_URL}/orders/store/${storeId}`, getFetchOptions("GET"))
+      // if (!response.ok) {
+      //   throw new Error("매장 주문 내역을 가져올 수 없습니다.")
+      // }
+      // return await response.json()
+
+      console.warn("매장별 주문 조회 API가 구현되지 않음 - 빈 배열 반환")
+      return []
     } catch (error) {
       console.error("매장 주문 내역 조회 에러:", error)
       throw error
@@ -461,23 +426,27 @@ export const businessMenuAPI = {
     try {
       console.log("메뉴 추가 시작:", { storeId, menuData })
 
-      // TODO: 실제 API 구현 필요
-      // const response = await fetch(`${API_BASE_URL}/store/${storeId}/menu`,
-      //   getFetchOptions("POST", menuData))
+      const response = await fetch(
+        `${API_BASE_URL}/store/${storeId}/menu`,
+        getFetchOptions("POST", {
+          storeid: storeId,
+          menuName: menuData.menuName,
+          price: menuData.price,
+          amount: menuData.amount,
+          description: menuData.description,
+        }),
+      )
 
-      // 임시 응답 생성
-      const newMenu: MenuDto = {
-        id: Date.now(), // 임시 ID
-        storeId,
-        menuName: menuData.menuName,
-        price: menuData.price,
-        amount: menuData.amount,
-        description: menuData.description,
-        createdAt: new Date().toISOString(),
-        lastUpdatedAt: new Date().toISOString(),
+      console.log("메뉴 추가 응답 상태:", response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("메뉴 추가 실패:", errorText)
+        throw new Error("메뉴 추가에 실패했습니다: " + errorText)
       }
 
-      console.log("메뉴 추가 성공 (임시):", newMenu)
+      const newMenu = await response.json()
+      console.log("메뉴 추가 성공:", newMenu)
       return newMenu
     } catch (error) {
       console.error("메뉴 추가 에러:", error)
@@ -485,37 +454,28 @@ export const businessMenuAPI = {
     }
   },
 
-  // 메뉴 수정
+  // 메뉴 수정 (기존 메뉴 삭제 후 새로 추가하는 방식)
   updateMenu: async (
-    menuId: number,
+    storeId: number,
+    oldMenuName: string,
     menuData: {
-      menuName?: string
-      price?: number
-      amount?: number
-      description?: string
+      menuName: string
+      price: number
+      amount: number
+      description: string
     },
   ): Promise<MenuDto> => {
     try {
-      console.log("메뉴 수정 시작:", { menuId, menuData })
+      console.log("메뉴 수정 시작:", { storeId, oldMenuName, menuData })
 
-      // TODO: 실제 API 구현 필요
-      // const response = await fetch(`${API_BASE_URL}/menu/${menuId}`,
-      //   getFetchOptions("PUT", menuData))
+      // 1. 기존 메뉴 삭제
+      await businessMenuAPI.deleteMenu(storeId, oldMenuName)
 
-      // 임시 응답 생성
-      const updatedMenu: MenuDto = {
-        id: menuId,
-        storeId: 1, // 임시
-        menuName: menuData.menuName || "수정된 메뉴",
-        price: menuData.price || 0,
-        amount: menuData.amount || 0,
-        description: menuData.description || "",
-        createdAt: new Date().toISOString(),
-        lastUpdatedAt: new Date().toISOString(),
-      }
+      // 2. 새 메뉴 추가
+      const newMenu = await businessMenuAPI.addMenu(storeId, menuData)
 
-      console.log("메뉴 수정 성공 (임시):", updatedMenu)
-      return updatedMenu
+      console.log("메뉴 수정 성공:", newMenu)
+      return newMenu
     } catch (error) {
       console.error("메뉴 수정 에러:", error)
       throw error
@@ -523,34 +483,125 @@ export const businessMenuAPI = {
   },
 
   // 메뉴 삭제
-  deleteMenu: async (menuId: number): Promise<void> => {
+  deleteMenu: async (storeId: number, menuName: string): Promise<void> => {
     try {
-      console.log("메뉴 삭제 시작:", menuId)
+      console.log("메뉴 삭제 시작:", { storeId, menuName })
 
-      // TODO: 실제 API 구현 필요
-      // const response = await fetch(`${API_BASE_URL}/menu/${menuId}`,
-      //   getFetchOptions("DELETE"))
+      const response = await fetch(
+        `${API_BASE_URL}/store/${storeId}/menu`,
+        getFetchOptions("DELETE", {
+          storeId: storeId,
+          menuName: menuName,
+        }),
+      )
 
-      console.log("메뉴 삭제 성공 (임시):", menuId)
+      console.log("메뉴 삭제 응답 상태:", response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("메뉴 삭제 실패:", errorText)
+        throw new Error("메뉴 삭제에 실패했습니다: " + errorText)
+      }
+
+      console.log("메뉴 삭제 성공:", { storeId, menuName })
     } catch (error) {
       console.error("메뉴 삭제 에러:", error)
       throw error
     }
   },
 
-  // 메뉴 품절/재개
-  toggleMenuAvailability: async (menuId: number, amount: number): Promise<void> => {
+  // 메뉴 품절/재개 (수량 업데이트)
+  toggleMenuAvailability: async (
+    storeId: number,
+    oldMenuName: string,
+    menuData: MenuDto,
+    newAmount: number,
+  ): Promise<void> => {
     try {
-      console.log("메뉴 품절/재개 시작:", { menuId, amount })
+      console.log("메뉴 품절/재개 시작:", { storeId, oldMenuName, newAmount })
 
-      // TODO: 실제 API 구현 필요
-      // const response = await fetch(`${API_BASE_URL}/menu/${menuId}/amount`,
-      //   getFetchOptions("PUT", { amount }))
+      // 기존 메뉴 삭제 후 새 수량으로 다시 추가
+      await businessMenuAPI.updateMenu(storeId, oldMenuName, {
+        menuName: menuData.menuName,
+        price: menuData.price,
+        amount: newAmount,
+        description: menuData.description,
+      })
 
-      console.log("메뉴 품절/재개 성공 (임시):", { menuId, amount })
+      console.log("메뉴 품절/재개 성공:", { storeId, oldMenuName, newAmount })
     } catch (error) {
       console.error("메뉴 품절/재개 에러:", error)
       throw error
+    }
+  },
+}
+
+// 매장 관리 API 추가
+export const businessStoreAPI = {
+  // 매장 생성
+  createStore: async (storeName: string, storeLocation: string): Promise<StoreDto> => {
+    try {
+      console.log("매장 생성 시작:", { storeName, storeLocation })
+
+      const response = await fetch(
+        `${API_BASE_URL}/store/save`,
+        getFetchOptions("POST", {
+          storeName: storeName,
+          storeLocation: storeLocation,
+        }),
+      )
+
+      console.log("매장 생성 응답 상태:", response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("매장 생성 실패:", errorText)
+        throw new Error("매장 생성에 실패했습니다: " + errorText)
+      }
+
+      const newStore = await response.json()
+      console.log("매장 생성 성공:", newStore)
+      return newStore
+    } catch (error) {
+      console.error("매장 생성 에러:", error)
+      throw error
+    }
+  },
+
+  // 사용자 이메일로 매장 찾기 (개선된 로직)
+  findStoreByOwnerEmail: async (email: string): Promise<StoreDto | null> => {
+    try {
+      console.log("가게 주인 매장 찾기:", email)
+
+      // TODO: 실제로는 사용자와 매장을 연결하는 API가 필요
+      // 예: /store/owner/{email} 또는 /users/{userId}/store
+
+      const stores = await storeAPI.getAllStores()
+      console.log("전체 매장 목록:", stores)
+
+      if (stores.length === 0) {
+        console.log("등록된 매장이 없습니다.")
+        return null
+      }
+
+      // 임시 로직: 이메일 기반으로 매장 찾기
+      const emailPrefix = email.split("@")[0].toLowerCase()
+      console.log("이메일 접두사:", emailPrefix)
+
+      // 1. 매장명에 이메일 접두사가 포함된 매장 찾기
+      let store = stores.find((store) => store.storeName.toLowerCase().includes(emailPrefix))
+
+      // 2. 찾지 못했다면 첫 번째 매장 반환 (임시)
+      if (!store) {
+        console.log("이메일 기반 매장을 찾지 못함, 첫 번째 매장 사용")
+        store = stores[0]
+      }
+
+      console.log("선택된 매장:", store)
+      return store
+    } catch (error) {
+      console.error("가게 주인 매장 찾기 에러:", error)
+      return null
     }
   },
 }
