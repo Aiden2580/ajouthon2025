@@ -44,15 +44,22 @@ export interface OrderDto {
   lastUpdatedAt: string
 }
 
-// 가게 주인용 주문 정보 (새로운 API 응답 형식)
-export interface BusinessOrderDto {
-  orderId: number
+export interface OrderResponseDto {
+  id: number
   userId: number
-  userName: string
+  storeName: string
   menuName: string
   price: number
-  status: "PENDING" | "COMPLETED"
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED"
   createdAt: string
+}
+
+// 가게 주인용 주문 정보 (확장된 정보 포함)
+export interface BusinessOrderDto extends OrderDto {
+  orderId: any
+  userName?: string
+  userEmail?: string
+  menuName?: string
 }
 
 // 실제 백엔드 API URL
@@ -382,11 +389,22 @@ export const orderAPI = {
   },
 
   // 사용자별 주문 내역 조회 (추후 API 추가 시 사용)
-  getUserOrders: async (userId: number): Promise<OrderDto[]> => {
+  getUserOrders: async (userId: number): Promise<OrderResponseDto[]> => {
     try {
-      // TODO: 백엔드에 사용자별 주문 내역 API가 추가되면 구현
-      console.log("사용자 주문 내역 조회 (미구현):", userId)
-      return []
+      const response = await fetch(`http://ajoutonback.hunian.site/orders/all_detail?userId=${userId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`주문 내역 조회 실패: ${errorText}`)
+      }
+
+      const orders: OrderResponseDto[] = await response.json()
+      return orders
     } catch (error) {
       console.error("사용자 주문 내역 조회 에러:", error)
       throw error

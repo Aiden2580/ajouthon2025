@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Clock, CheckCircle, Star } from "lucide-react"
 import Link from "next/link"
-import { orderStorage, type LocalOrderDto } from "@/lib/auth"
+import { orderStorage, type LocalOrderDto, OrderResponseDto } from "@/lib/auth"
 
 const statusConfig = {
   PENDING: { label: "주문접수", color: "bg-yellow-500", icon: Clock },
@@ -25,7 +25,8 @@ const fetchOrders = async (userId: number) => {
 
 export default function OrdersPage() {
   const [selectedTab, setSelectedTab] = useState("all")
-  const [orders, setOrders] = useState<LocalOrderDto[]>([])
+  // const [orders, setOrders] = useState<LocalOrderDto[]>([])
+  const [orders, setOrders] = useState<OrderResponseDto[]>([])
   const [loading, setLoading] = useState(true)
 
   const [userId, setUserId] = useState<number | null>(null)
@@ -64,8 +65,8 @@ export default function OrdersPage() {
   // 필터링된 주문 목록
   const filteredOrders = orders.filter((order) => {
     if (selectedTab === "all") return true
-    if (selectedTab === "ongoing") return order.status !== "completed"
-    if (selectedTab === "completed") return order.status === "completed"
+    if (selectedTab === "ongoing") return order.status !== "COMPLETED"
+    if (selectedTab === "completed") return order.status === "COMPLETED"
     return true
   })
 
@@ -134,53 +135,22 @@ export default function OrdersPage() {
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h3 className="font-medium">{order.storeName}</h3>
-                        <p className="text-sm text-gray-500">주문번호: {order.orderNumber}</p>
+                        <p className="text-sm text-gray-500">
+                          접수번호: {order.id} / 메뉴: {order.menuName}
+                        </p>
                       </div>
-                      <Badge className={`${statusConfig[order.status as keyof typeof statusConfig].color} text-white`}>
+                      <Badge className={`${statusInfo.color} text-white`}>
                         <StatusIcon className="h-3 w-3 mr-1" />
-                        {statusConfig[order.status as keyof typeof statusConfig].label}
+                        {statusInfo.label}
                       </Badge>
                     </div>
 
-                    <div className="space-y-1 mb-3">
-                      {(order.items ?? []).map((item, index) => (
-                        <p key={index} className="text-sm text-gray-700">
-                          • {item.menuName} x {item.quantity}
-                        </p>
-                      ))}
-                    </div>
-
                     <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
-                      <span>주문시간: {order.orderTime ?? "정보 없음"}</span>
+                      <span>주문시간: {new Date(order.createdAt).toLocaleString()}</span>
                       <span className="font-bold text-lg text-gray-900">
-                        {(order.price ?? 0).toLocaleString()}원
+                        {order.price.toLocaleString()}원
                       </span>
                     </div>
-
-                    {order.status === "completed" && (
-                      <Button variant="outline" size="sm" className="w-full">
-                        <Star className="h-4 w-4 mr-1" />
-                        후기 작성하기
-                      </Button>
-                    )}
-
-                    {order.status === "ready" && (
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <p className="text-sm font-medium text-blue-800">🔔 픽업 준비완료! 매장에서 수령해주세요</p>
-                        <p className="text-xs text-blue-600 mt-1">
-                          예상 픽업시간: {order.estimatedPickupTime || order.orderTime}
-                        </p>
-                      </div>
-                    )}
-
-                    {order.status === "preparing" && (
-                      <div className="bg-orange-50 p-3 rounded-lg">
-                        <p className="text-sm font-medium text-orange-800">👨‍🍳 주문을 준비중입니다</p>
-                        <p className="text-xs text-orange-600 mt-1">
-                          예상 완료시간: {order.estimatedPickupTime || order.orderTime}
-                        </p>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               )

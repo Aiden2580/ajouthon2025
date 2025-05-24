@@ -292,11 +292,16 @@ function HomePage() {
                     <CardContent className="p-0">
                       <div className="flex">
                         <div className="relative w-24 h-24 flex-shrink-0">
-                          <img
+                          {/* <img
                             src={store.image || "/placeholder.svg"}
                             alt={store.name}
                             className="w-full h-full object-cover rounded-l-lg"
-                          />
+                          /> */}
+                          <div
+  className="w-full h-full object-cover bg-gray-0 flex items-center justify-center text-6xl rounded-l-lg"
+>
+  🏬
+</div>
                           {!store.isOpen && (
                             <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-l-lg">
                               <span className="text-white text-xs font-medium">영업종료</span>
