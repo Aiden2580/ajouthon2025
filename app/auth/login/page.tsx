@@ -36,16 +36,28 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
+      console.log("로그인 시도 중...")
+
       const userData = await authAPI.login(email, password)
 
       // 로그인 성공 시 사용자 정보 저장
       authStorage.setUser(userData)
 
-      // 메인 페이지로 리다이렉트
-      window.location.href = "/"
+      // 사용자 역할에 따라 다른 페이지로 리다이렉트
+      if (userData.role === "BUSINESS") {
+        window.location.href = "/business"
+      } else {
+        window.location.href = "/"
+      }
     } catch (error) {
       console.error("로그인 오류:", error)
-      setError(error instanceof Error ? error.message : "로그인에 실패했습니다.")
+
+      let errorMessage = "로그인에 실패했습니다."
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
