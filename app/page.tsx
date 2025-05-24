@@ -5,9 +5,10 @@ import { useState } from "react"
 // import axios from 'axios'
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Search, ShoppingCart, Star, Clock, MapPin } from "lucide-react"
+import { Search, ShoppingCart, Star, Clock, MapPin, X } from "lucide-react"
 import Link from "next/link"
 
 // TODO: API 연동 - 실제 API에서 매장 데이터를 가져오는 함수
@@ -18,6 +19,22 @@ import Link from "next/link"
 //     return data
 //   } catch (error) {
 //     console.error('매장 데이터 로딩 실패:', error)
+//     return []
+//   }
+// }
+
+// TODO: API 연동 - 검색 API 함수 (매장명 + 메뉴명 검색)
+// const searchStoresAndMenus = async (query: string, category?: string) => {
+//   try {
+//     const params = new URLSearchParams()
+//     if (query) params.append('q', query)
+//     if (category) params.append('category', category)
+//
+//     const response = await fetch(`/api/search?${params}`)
+//     const data = await response.json()
+//     return data
+//   } catch (error) {
+//     console.error('검색 실패:', error)
 //     return []
 //   }
 // }
@@ -34,6 +51,7 @@ const stores = [
     distance: "도보 2분",
     isOpen: true,
     tags: ["한식", "저렴함", "빠름"],
+    menus: ["김치찌개", "불고기덮밥", "된장찌개", "비빔밥"],
   },
   {
     id: 2,
@@ -45,6 +63,7 @@ const stores = [
     distance: "도보 3분",
     isOpen: true,
     tags: ["커피", "디저트", "조용함"],
+    menus: ["아메리카노", "카페라떼", "크로와상", "치즈케이크"],
   },
   {
     id: 3,
@@ -56,6 +75,7 @@ const stores = [
     distance: "도보 1분",
     isOpen: false,
     tags: ["간편식", "24시간", "다양함"],
+    menus: ["삼각김밥", "컵라면", "샌드위치", "음료수"],
   },
   {
     id: 4,
@@ -67,6 +87,7 @@ const stores = [
     distance: "도보 5분",
     isOpen: true,
     tags: ["한식", "정갈함", "넓음"],
+    menus: ["정식", "갈비탕", "냉면", "돈까스"],
   },
   {
     id: 5,
@@ -78,6 +99,7 @@ const stores = [
     distance: "도보 4분",
     isOpen: true,
     tags: ["브랜드", "스터디", "와이파이"],
+    menus: ["아메리카노", "프라푸치노", "머핀", "쿠키"],
   },
   {
     id: 6,
@@ -89,18 +111,46 @@ const stores = [
     distance: "도보 3분",
     isOpen: true,
     tags: ["굿즈", "기념품", "학용품"],
+    menus: ["아주대 후드티", "텀블러", "볼펜", "노트"],
+  },
+  {
+    id: 7,
+    name: "투썸플레이스",
+    category: "cafe",
+    image: "/placeholder.svg?height=120&width=200",
+    rating: 4.1,
+    reviewCount: 92,
+    distance: "도보 6분",
+    isOpen: true,
+    tags: ["디저트", "케이크", "브랜드"],
+    menus: ["아메리카노", "생크림케이크", "마카롱", "샐러드"],
+  },
+  {
+    id: 8,
+    name: "기숙사식당",
+    category: "restaurant",
+    image: "/placeholder.svg?height=120&width=200",
+    rating: 4.0,
+    reviewCount: 78,
+    distance: "도보 8분",
+    isOpen: true,
+    tags: ["한식", "저렴함", "기숙사"],
+    menus: ["백반", "라면", "김치볶음밥", "계란말이"],
   },
 ]
 
 const categories = [
-  { id: "cafe", name: "카페", color: "bg-white text-gray-700" },
-  { id: "restaurant", name: "식당", color: "bg-white text-gray-700" },
-  { id: "preorder", name: "프리오더", color: "bg-white text-gray-700" },
+  { id: "cafe", name: "카페" },
+  { id: "restaurant", name: "식당" },
+  { id: "preorder", name: "프리오더" },
 ]
 
 export default function HomePage() {
-  const [selectedCategory, setSelectedCategory] = useState("restaurant") // HARDCODED: 기본 선택 카테고리
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchBar, setShowSearchBar] = useState(false)
+  const [searchResults, setSearchResults] = useState<any[]>([])
   // TODO: API 연동 - 매장 데이터 상태 관리
   // const [stores, setStores] = useState([])
   // const [loading, setLoading] = useState(true)
@@ -116,15 +166,80 @@ export default function HomePage() {
   //   loadStores()
   // }, [])
 
-  const filteredStores = stores.filter((store) => {
-    const matchesCategory = store.category === selectedCategory
-    const matchesSearch = store.name.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
+  // TODO: API 연동 - 검색 로직
+  // useEffect(() => {
+  //   const performSearch = async () => {
+  //     if (searchQuery.trim()) {
+  //       setIsSearching(true)
+  //       const results = await searchStoresAndMenus(searchQuery, selectedCategory)
+  //       setSearchResults(results)
+  //       setIsSearching(false)
+  //     } else {
+  //       setSearchResults([])
+  //     }
+  //   }
+  //
+  //   const debounceTimer = setTimeout(performSearch, 300)
+  //   return () => clearTimeout(debounceTimer)
+  // }, [searchQuery, selectedCategory])
+
+  // 매장명과 메뉴명으로 검색하는 로직
+  const performLocalSearch = () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    const query = searchQuery.toLowerCase()
+    const results = stores
+      .filter((store) => {
+        // 매장명으로 검색
+        const storeNameMatch = store.name.toLowerCase().includes(query)
+        // 메뉴명으로 검색
+        const menuMatch = store.menus.some((menu) => menu.toLowerCase().includes(query))
+
+        return storeNameMatch || menuMatch
+      })
+      .map((store) => {
+        // 매칭된 메뉴들 찾기
+        const matchedMenus = store.menus.filter((menu) => menu.toLowerCase().includes(query))
+
+        return {
+          ...store,
+          matchedMenus,
+          matchType: store.name.toLowerCase().includes(query) ? "store" : "menu",
+        }
+      })
+
+    setSearchResults(results)
+  }
+
+  // 검색어 변경 시 실시간 검색
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (value.trim()) {
+      performLocalSearch()
+    } else {
+      setSearchResults([])
+    }
+  }
+
+  const filteredStores = searchQuery
+    ? searchResults
+    : stores.filter((store) => {
+        const matchesCategory = selectedCategory === null || store.category === selectedCategory
+        return matchesCategory
+      })
 
   // HARDCODED: 카테고리별 한글 제목 매핑
-  const getCategoryTitle = (category: string) => {
-    switch (category) {
+  const getCategoryTitle = () => {
+    if (searchQuery) {
+      return `"${searchQuery}" 검색 결과`
+    }
+    if (selectedCategory === null) {
+      return "전체 매장"
+    }
+    switch (selectedCategory) {
       case "cafe":
         return "카페"
       case "restaurant":
@@ -136,6 +251,27 @@ export default function HomePage() {
     }
   }
 
+  const handleCategoryClick = (categoryId: string) => {
+    if (selectedCategory === categoryId) {
+      setSelectedCategory(null)
+    } else {
+      setSelectedCategory(categoryId)
+    }
+  }
+
+  const clearSearch = () => {
+    setSearchQuery("")
+    setSearchResults([])
+    setShowSearchBar(false)
+  }
+
+  const toggleSearch = () => {
+    setShowSearchBar(!showSearchBar)
+    if (showSearchBar) {
+      clearSearch()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -144,7 +280,9 @@ export default function HomePage() {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold">AjouOrder</h1>
             <div className="flex items-center gap-3">
-              <Search className="h-6 w-6" />
+              <Button variant="ghost" size="icon" onClick={toggleSearch} className="text-white hover:bg-white/10">
+                <Search className="h-6 w-6" />
+              </Button>
               <Link href="/cart">
                 <div className="relative">
                   <ShoppingCart className="h-6 w-6" />
@@ -155,40 +293,82 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Category Buttons */}
-          <div className="flex justify-center gap-4">
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={selectedCategory === category.id ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(category.id)}
-                className={`${
-                  selectedCategory === category.id
-                    ? "bg-white text-blue-600 border-white"
-                    : "bg-transparent text-white border-white/30 hover:bg-white/10"
-                } rounded-full px-4 flex-1 max-w-[100px]`}
-              >
-                {category.name}
-              </Button>
-            ))}
-          </div>
+          {/* Search Bar - 조건부 렌더링 */}
+          {showSearchBar && (
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="가게나 메뉴를 검색하세요"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10 pr-10 bg-white text-gray-900"
+                autoFocus
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Category Buttons - 검색 중이 아닐 때만 표시 */}
+          {!showSearchBar && (
+            <div className="flex justify-center gap-4">
+              {categories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCategoryClick(category.id)}
+                  className={`${
+                    selectedCategory === category.id
+                      ? "bg-white text-[#0051a2] border-white"
+                      : "bg-white text-gray-700 border-white hover:bg-gray-100"
+                  } rounded-full px-4 flex-1 max-w-[100px]`}
+                >
+                  {category.name}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
       </header>
 
       <div className="max-w-md mx-auto">
-        {/* Category Title */}
+        {/* Category/Search Title */}
         <div className="px-4 py-4 bg-white">
-          <h2 className="text-lg font-bold text-gray-900">{getCategoryTitle(selectedCategory)}</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">{getCategoryTitle()}</h2>
+            <span className="text-sm text-gray-500">{filteredStores.length}개 매장</span>
+          </div>
         </div>
 
         {/* Store List */}
         <div className="px-4 pb-20 bg-white">
           <div className="space-y-4">
-            {filteredStores.length === 0 ? (
+            {isSearching ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="text-4xl mb-4">🔍</div>
+                <p className="text-gray-500">검색 중...</p>
+              </div>
+            ) : filteredStores.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="text-4xl mb-4">🏪</div>
-                <p className="text-gray-500">해당 카테고리에 매장이 없습니다</p>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {searchQuery ? "검색 결과가 없습니다" : "매장이 없습니다"}
+                </h3>
+                <p className="text-gray-500">
+                  {searchQuery ? "다른 검색어를 시도해보세요" : "해당 카테고리에 매장이 없습니다"}
+                </p>
+                {searchQuery && (
+                  <Button onClick={clearSearch} variant="outline" className="mt-4">
+                    검색 초기화
+                  </Button>
+                )}
               </div>
             ) : (
               filteredStores.map((store) => (
@@ -210,8 +390,24 @@ export default function HomePage() {
                         </div>
                         <div className="flex-1 p-4">
                           <div className="flex items-start justify-between">
-                            <div>
-                              <h3 className="font-medium text-gray-900">{store.name}</h3>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-gray-900">{store.name}</h3>
+                                <Badge variant="outline" className="text-xs">
+                                  {categories.find((cat) => cat.id === store.category)?.name}
+                                </Badge>
+                              </div>
+
+                              {/* 검색 결과에서 매칭된 메뉴 표시 */}
+                              {searchQuery && store.matchedMenus && store.matchedMenus.length > 0 && (
+                                <div className="mt-1">
+                                  <p className="text-xs text-blue-600">
+                                    메뉴: {store.matchedMenus.slice(0, 2).join(", ")}
+                                    {store.matchedMenus.length > 2 && ` 외 ${store.matchedMenus.length - 2}개`}
+                                  </p>
+                                </div>
+                              )}
+
                               <div className="flex items-center gap-1 mt-1">
                                 <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                                 <span className="text-sm text-gray-600">
