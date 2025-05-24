@@ -238,7 +238,7 @@ function BusinessDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 mb-4">��어온 주문을 확인하고 처리 상태를 변경하세요.</p>
+              <p className="text-gray-600 mb-4">들어온 주문을 확인하고 처리 상태를 변경하세요.</p>
               <Link href="/business/orders">
                 <Button className="w-full">주문 관리하기</Button>
               </Link>
