@@ -139,7 +139,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <header className="bg-blue-600 text-white sticky top-0 z-50">
+      <header className="bg-[#0051a2] text-white sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold">AjouOrder</h1>
@@ -156,7 +156,7 @@ export default function HomePage() {
           </div>
 
           {/* Category Buttons */}
-          <div className="flex gap-2">
+          <div className="flex justify-center gap-4">
             {categories.map((category) => (
               <Button
                 key={category.id}
@@ -167,7 +167,7 @@ export default function HomePage() {
                   selectedCategory === category.id
                     ? "bg-white text-blue-600 border-white"
                     : "bg-transparent text-white border-white/30 hover:bg-white/10"
-                } rounded-full px-4`}
+                } rounded-full px-4 flex-1 max-w-[100px]`}
               >
                 {category.name}
               </Button>
@@ -230,13 +230,6 @@ export default function HomePage() {
                               </div>
                             </div>
                           </div>
-                          <div className="flex gap-1 mt-2">
-                            {store.tags.slice(0, 3).map((tag, index) => (
-                              <Badge key={index} variant="secondary" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -249,7 +242,7 @@ export default function HomePage() {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-blue-400 text-white">
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#66aadf] text-white">
         <div className="max-w-md mx-auto px-4 py-2">
           <div className="flex justify-around">
             <Link href="/" className="flex flex-col items-center py-2 text-white">
