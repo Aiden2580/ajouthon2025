@@ -378,9 +378,20 @@ export const orderAPI = {
   // 사용자별 주문 내역 조회 (추후 API 추가 시 사용)
   getUserOrders: async (userId: number): Promise<OrderDto[]> => {
     try {
-      // TODO: 백엔드에 사용자별 주문 내역 API가 추가되면 구현
-      console.log("사용자 주문 내역 조회 (미구현):", userId)
-      return []
+      const response = await fetch(`http://ajoutonback.hunian.site/orders/all_detail?userId=${userId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`주문 내역 조회 실패: ${errorText}`)
+      }
+
+      const orders: OrderDto[] = await response.json()
+      return orders
     } catch (error) {
       console.error("사용자 주문 내역 조회 에러:", error)
       throw error
@@ -738,7 +749,7 @@ export interface LocalOrderDto {
   orderNumber: string
   storeName: string
   items: { menuName: string; quantity: number; price: number }[]
-  totalAmount: number
+  price: number
   orderTime: string
   status: "preparing" | "ready" | "completed"
   specialRequest?: string
@@ -816,12 +827,12 @@ export const userStatsAPI = {
         : "아직 없음"
 
     // 총 주문 금액
-    const totalAmount = userOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+    const price = userOrders.reduce((sum, order) => sum + order.price, 0)
 
     return {
       totalOrders,
       favoriteStore,
-      totalAmount,
+      price,
     }
   },
 }
