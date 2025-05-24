@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -9,12 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, CreditCard, Smartphone } from "lucide-react"
 import Link from "next/link"
-import { orderAPI, authStorage } from "@/lib/auth"
-
-const orderItems = [
-  { name: "김치찌개", quantity: 2, price: 4500 },
-  { name: "불고기덮밥", quantity: 1, price: 5000 },
-]
+import { orderAPI, authStorage, cartStorage, orderStorage, type CartItem, type LocalOrderDto } from "@/lib/auth"
 
 const paymentMethods = [
   { id: "card", name: "신용카드", icon: CreditCard },
@@ -23,14 +18,23 @@ const paymentMethods = [
 ]
 
 export default function CheckoutPage() {
+  const [orderItems, setOrderItems] = useState<CartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState("card")
   const [specialRequest, setSpecialRequest] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const totalPrice = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const deliveryFee = 1000
-  const finalPrice = totalPrice + deliveryFee
+  useEffect(() => {
+    // 장바구니에서 주문 아이템 가져오기
+    const cartItems = cartStorage.getItems()
+    setOrderItems(cartItems)
+  }, [])
 
+  // 배달비 제거 및 실제 장바구니 데이터 사용
+  const totalPrice = cartStorage.getTotalPrice()
+  // const deliveryFee = 1000 // 제거
+  const finalPrice = totalPrice // deliveryFee 제거
+
+  // 주문 생성 시 로컬 주문 내역에도 저장하도록 수정
   const handlePayment = async () => {
     setIsLoading(true)
 
@@ -42,29 +46,73 @@ export default function CheckoutPage() {
         return
       }
 
-      // 각 메뉴에 대해 주문 생성 (현재 API는 한 번에 하나의 메뉴만 주문 가능)
+      if (orderItems.length === 0) {
+        alert("주문할 상품이 없습니다.")
+        return
+      }
+
+      // 각 메뉴에 대해 주문 생성
       const orders = []
       for (const item of orderItems) {
         for (let i = 0; i < item.quantity; i++) {
-          const order = await orderAPI.createOrder(
-            user.id,
-            1, // 임시 storeId, 실제로는 장바구니에서 가져와야 함
-            item.name,
-          )
-          orders.push(order)
+          try {
+            const order = await orderAPI.createOrder(user.id, item.storeId, item.menuName)
+            orders.push(order)
+          } catch (error) {
+            console.error(`주문 생성 실패 (${item.menuName}):`, error)
+            throw new Error(`${item.menuName} 주문 생성에 실패했습니다.`)
+          }
         }
       }
 
-      // 결제 성공 시 주문 완료 페이지로 이동
+      // 로컬 주문 내역에 저장
+      if (orders.length > 0) {
+        const localOrder: LocalOrderDto = {
+          id: orders[0].id.toString(),
+          orderNumber: `AO${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}${String(orders[0].id).padStart(3, "0")}`,
+          storeName: orderItems[0].storeName,
+          items: orderItems.map((item) => ({
+            menuName: item.menuName,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          totalAmount: finalPrice,
+          orderTime: new Date().toLocaleString("ko-KR"),
+          status: "preparing",
+          specialRequest: specialRequest || undefined,
+        }
+
+        orderStorage.addOrder(localOrder)
+      }
+
+      // 주문 성공 시 장바구니 비우기
+      cartStorage.clearCart()
+
+      // 주문 완료 페이지로 이동
       if (orders.length > 0) {
         window.location.href = `/order-complete/${orders[0].id}`
       }
     } catch (error) {
       console.error("결제 오류:", error)
-      alert("결제 처리 중 오류가 발생했습니다.")
+      alert(error instanceof Error ? error.message : "결제 처리 중 오류가 발생했습니다.")
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (orderItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🛒</div>
+          <h2 className="text-lg font-medium text-gray-900 mb-2">주문할 상품이 없습니다</h2>
+          <p className="text-gray-500 mb-6">장바구니에 상품을 담아주세요!</p>
+          <Link href="/">
+            <Button>메뉴 보러가기</Button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -92,7 +140,7 @@ export default function CheckoutPage() {
               {orderItems.map((item, index) => (
                 <div key={index} className="flex justify-between">
                   <span>
-                    {item.name} x {item.quantity}
+                    {item.menuName} x {item.quantity}
                   </span>
                   <span>{(item.price * item.quantity).toLocaleString()}원</span>
                 </div>
@@ -136,15 +184,13 @@ export default function CheckoutPage() {
         <Card className="mt-4 mx-4">
           <CardContent className="p-4">
             <h3 className="font-medium mb-3">결제 정보</h3>
+            {/* 결제 정보 섹션에서 배달비 제거 */}
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span>상품 금액</span>
                 <span>{totalPrice.toLocaleString()}원</span>
               </div>
-              <div className="flex justify-between">
-                <span>배달비</span>
-                <span>{deliveryFee.toLocaleString()}원</span>
-              </div>
+              {/* 배달비 부분 제거 */}
               <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>총 결제 금액</span>

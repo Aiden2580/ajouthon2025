@@ -5,15 +5,37 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Star, Heart, Plus, Minus, ShoppingCart } from "lucide-react"
 import Link from "next/link"
-import { storeAPI } from "@/lib/auth"
+import { storeAPI, cartStorage, favoriteStorage, type StoreDto, type MenuDto } from "@/lib/auth"
 
 export default function StorePage({ params }: { params: { id: string } }) {
-  const [storeData, setStoreData] = useState<any>(null)
-  const [menuItems, setMenuItems] = useState<any[]>([])
+  const [storeData, setStoreData] = useState<StoreDto | null>(null)
+  const [menuItems, setMenuItems] = useState<MenuDto[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [cart, setCart] = useState<{ [key: number]: number }>({})
   const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({})
+  const [cartCount, setCartCount] = useState(0)
+
+  // 장바구니 개수 업데이트
+  useEffect(() => {
+    const updateCartCount = () => {
+      setCartCount(cartStorage.getTotalCount())
+    }
+
+    updateCartCount()
+
+    const handleCartChange = () => {
+      updateCartCount()
+    }
+
+    window.addEventListener("cartChanged", handleCartChange)
+    window.addEventListener("storage", handleCartChange)
+
+    return () => {
+      window.removeEventListener("cartChanged", handleCartChange)
+      window.removeEventListener("storage", handleCartChange)
+    }
+  }, [])
 
   // 데이터 로딩
   useEffect(() => {
@@ -21,47 +43,31 @@ export default function StorePage({ params }: { params: { id: string } }) {
       setLoading(true)
       try {
         const storeId = Number.parseInt(params.id)
-        const menuData = await storeAPI.getStoreMenus(storeId)
 
-        // 임시 매장 데이터 (실제로는 매장 상세 정보 API가 필요)
-        setStoreData({
-          id: storeId,
-          name: "매장명",
-          image: "/placeholder.svg?height=200&width=400",
-          rating: 4.5,
-          reviewCount: 128,
-          description: "맛있는 음식을 제공하는 매장입니다",
-          openTime: "11:00 - 20:00",
-          phone: "031-219-1234",
-        })
+        // 매장 정보와 메뉴 정보를 병렬로 로드
+        const [storeInfo, menuData] = await Promise.all([
+          storeAPI.findStoreById(storeId),
+          storeAPI.getStoreMenus(storeId),
+        ])
 
-        // API 응답을 기존 형태에 맞게 변환
-        const transformedMenus = menuData.map((menu: any) => ({
-          id: menu.id,
-          name: menu.menuName,
-          price: menu.price,
-          image: "/placeholder.svg?height=80&width=80",
-          description: menu.description || "맛있는 메뉴입니다",
-          category: "all",
-          isFavorite: false,
-          tags: ["맛있음", "추천"],
-          likes: Math.floor(Math.random() * 100),
-          isPopular: Math.random() > 0.5,
-          amount: menu.amount,
-        }))
+        if (storeInfo) {
+          setStoreData(storeInfo)
+        } else {
+          // 매장 정보를 찾을 수 없는 경우 기본값 설정
+          setStoreData({
+            id: storeId,
+            storeName: "매장을 찾을 수 없습니다",
+            storeLocation: "위치 정보 없음",
+          })
+        }
 
-        setMenuItems(transformedMenus)
+        setMenuItems(menuData)
       } catch (error) {
         console.error("데이터 로딩 실패:", error)
         setStoreData({
           id: Number.parseInt(params.id),
-          name: "매장을 찾을 수 없습니다",
-          image: "/placeholder.svg?height=200&width=400",
-          rating: 0,
-          reviewCount: 0,
-          description: "",
-          openTime: "",
-          phone: "",
+          storeName: "매장을 찾을 수 없습니다",
+          storeLocation: "위치 정보 없음",
         })
         setMenuItems([])
       } finally {
@@ -71,37 +77,78 @@ export default function StorePage({ params }: { params: { id: string } }) {
     loadData()
   }, [params.id])
 
+  // 즐겨찾기 상태 로딩
+  useEffect(() => {
+    const loadFavorites = () => {
+      const favoriteIds = favoriteStorage.getFavorites()
+      const favoriteMap: { [key: number]: boolean } = {}
+      favoriteIds.forEach((id) => {
+        favoriteMap[id] = true
+      })
+      setFavorites(favoriteMap)
+    }
+
+    loadFavorites()
+
+    const handleFavoritesChange = () => {
+      loadFavorites()
+    }
+
+    window.addEventListener("favoritesChanged", handleFavoritesChange)
+    return () => window.removeEventListener("favoritesChanged", handleFavoritesChange)
+  }, [])
+
   const menuCategories = [
     { id: "all", name: "전체 메뉴", icon: "🍽️" },
-    { id: "popular", name: "인기 메뉴", icon: "🏆" },
+    { id: "available", name: "주문 가능", icon: "✅" },
   ]
 
-  const filteredMenus = menuItems.filter((item) =>
-    selectedCategory === "all" ? true : selectedCategory === "popular" ? item.isPopular : true,
-  )
+  const filteredMenus = menuItems.filter((item) => {
+    if (selectedCategory === "all") return true
+    if (selectedCategory === "available") return item.amount > 0
+    return true
+  })
 
-  const addToCart = (itemId: number) => {
+  const addToCart = (menu: MenuDto) => {
+    if (!storeData) return
+
+    // 로컬 상태 업데이트
     setCart((prev) => ({
       ...prev,
-      [itemId]: (prev[itemId] || 0) + 1,
+      [menu.id]: (prev[menu.id] || 0) + 1,
     }))
+
+    // 로컬 스토리지에 추가
+    cartStorage.addItem({
+      id: menu.id,
+      menuName: menu.menuName,
+      price: menu.price,
+      storeId: storeData.id,
+      storeName: storeData.storeName,
+    })
   }
 
-  const removeFromCart = (itemId: number) => {
+  const removeFromCart = (menuId: number) => {
     setCart((prev) => ({
       ...prev,
-      [itemId]: Math.max((prev[itemId] || 0) - 1, 0),
+      [menuId]: Math.max((prev[menuId] || 0) - 1, 0),
     }))
+
+    const currentQuantity = cart[menuId] || 0
+    if (currentQuantity > 1) {
+      cartStorage.updateQuantity(menuId, currentQuantity - 1)
+    } else {
+      cartStorage.removeItem(menuId)
+    }
   }
 
   const toggleFavorite = (itemId: number) => {
+    favoriteStorage.toggleFavorite(itemId)
     setFavorites((prev) => ({
       ...prev,
       [itemId]: !prev[itemId],
     }))
   }
-
-  const totalItems = Object.values(cart).reduce((sum, count) => sum + count, 0)
 
   if (loading) {
     return (
@@ -124,12 +171,12 @@ export default function StorePage({ params }: { params: { id: string } }) {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <h1 className="font-medium">{storeData?.name}</h1>
+            <h1 className="font-medium">{storeData?.storeName}</h1>
             <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
-                {totalItems > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs">{totalItems}</Badge>
+                {cartCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs">{cartCount}</Badge>
                 )}
               </Button>
             </Link>
@@ -141,23 +188,23 @@ export default function StorePage({ params }: { params: { id: string } }) {
         {/* Store Info */}
         <div className="bg-white">
           <img
-            src={storeData?.image || "/placeholder.svg"}
-            alt={storeData?.name}
+            src={storeData?.image || "/placeholder.svg?height=200&width=400"}
+            alt={storeData?.storeName}
             className="w-full h-48 object-cover"
           />
           <div className="p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">{storeData?.name}</h2>
+              <h2 className="text-xl font-bold">{storeData?.storeName}</h2>
               <div className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-medium">{storeData?.rating}</span>
-                <span className="text-gray-500">({storeData?.reviewCount})</span>
+                <span className="font-medium">{storeData?.rating || 4.5}</span>
+                <span className="text-gray-500">({storeData?.reviewCount || 128})</span>
               </div>
             </div>
-            <p className="text-gray-600 mt-1">{storeData?.description}</p>
+            <p className="text-gray-600 mt-1">{storeData?.storeLocation}</p>
             <div className="flex gap-4 mt-2 text-sm text-gray-500">
-              <span>⏰ {storeData?.openTime}</span>
-              <span>📞 {storeData?.phone}</span>
+              <span>⏰ {storeData?.openTime || "11:00 - 20:00"}</span>
+              <span>📞 {storeData?.phone || "031-219-1234"}</span>
             </div>
           </div>
         </div>
@@ -194,24 +241,24 @@ export default function StorePage({ params }: { params: { id: string } }) {
                 <div key={item.id} className="p-4">
                   <div className="flex gap-3">
                     <img
-                      src={item.image || "/placeholder.svg"}
-                      alt={item.name}
+                      src="/placeholder.svg?height=80&width=80"
+                      alt={item.menuName}
                       className="w-20 h-20 rounded-lg object-cover"
                     />
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-medium">{item.name}</h3>
-                            {item.isPopular && (
+                            <h3 className="font-medium">{item.menuName}</h3>
+                            {item.amount > 0 && item.amount < 5 && (
                               <Badge variant="destructive" className="text-xs">
-                                인기
+                                품절임박
                               </Badge>
                             )}
                           </div>
                           <p className="text-sm text-gray-600 mt-1">{item.description}</p>
                           <p className="font-bold text-lg mt-1">{item.price.toLocaleString()}원</p>
-                          {item.amount > 0 && <p className="text-sm text-gray-500">재고: {item.amount}개</p>}
+                          <p className="text-sm text-gray-500">재고: {item.amount}개</p>
                         </div>
                         <Button
                           variant="ghost"
@@ -221,18 +268,6 @@ export default function StorePage({ params }: { params: { id: string } }) {
                         >
                           <Heart className={`h-5 w-5 ${favorites[item.id] ? "fill-red-500 text-red-500" : ""}`} />
                         </Button>
-                      </div>
-
-                      {/* Tags */}
-                      <div className="flex gap-1 mt-2">
-                        {item.tags.map((tag: string, index: number) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        <div className="flex items-center gap-1 ml-auto">
-                          <span className="text-xs text-gray-500">👍 {item.likes}</span>
-                        </div>
                       </div>
 
                       {/* Add to Cart */}
@@ -252,18 +287,13 @@ export default function StorePage({ params }: { params: { id: string } }) {
                             variant="outline"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => addToCart(item.id)}
+                            onClick={() => addToCart(item)}
                             disabled={item.amount === 0}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => addToCart(item.id)}
-                          className="ml-2"
-                          disabled={item.amount === 0}
-                        >
+                        <Button size="sm" onClick={() => addToCart(item)} className="ml-2" disabled={item.amount === 0}>
                           {item.amount === 0 ? "품절" : "담기"}
                         </Button>
                       </div>
@@ -279,12 +309,12 @@ export default function StorePage({ params }: { params: { id: string } }) {
       </div>
 
       {/* Cart Bottom Bar */}
-      {totalItems > 0 && (
+      {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
           <div className="max-w-md mx-auto p-4">
             <Link href="/cart">
               <Button className="w-full" size="lg">
-                장바구니 보기 ({totalItems}개)
+                장바구니 보기 ({cartCount}개)
               </Button>
             </Link>
           </div>

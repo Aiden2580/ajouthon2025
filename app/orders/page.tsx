@@ -1,79 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Clock, CheckCircle, Star } from "lucide-react"
 import Link from "next/link"
-
-// TODO: API 연동 - 주문 내역 가져오기
-// const fetchOrders = async (status?: string) => {
-//   try {
-//     const url = status ? `/api/orders?status=${status}` : '/api/orders'
-//     const response = await fetch(url, {
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//     return await response.json()
-//   } catch (error) {
-//     console.error('주문 내역 로딩 실패:', error)
-//     return []
-//   }
-// }
-
-// const submitReview = async (orderId: number, tags: string[], rating: number) => {
-//   try {
-//     await fetch(`/api/orders/${orderId}/review`, {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       },
-//       body: JSON.stringify({ tags, rating })
-//     })
-//   } catch (error) {
-//     console.error('후기 작성 실패:', error)
-//   }
-// }
-
-const orders = [
-  {
-    id: 1,
-    orderNumber: "AO240124001",
-    storeName: "학생식당",
-    items: ["김치찌개", "불고기덮밥"],
-    totalPrice: 14000,
-    status: "completed",
-    orderTime: "2024-01-24 12:30",
-    pickupTime: "2024-01-24 12:45",
-    isReviewed: false,
-  },
-  {
-    id: 2,
-    orderNumber: "AO240124002",
-    storeName: "카페 드림",
-    items: ["아메리카노", "크로와상"],
-    totalPrice: 8500,
-    status: "preparing",
-    orderTime: "2024-01-24 14:20",
-    pickupTime: "2024-01-24 14:35",
-    isReviewed: false,
-  },
-  {
-    id: 3,
-    orderNumber: "AO240123001",
-    storeName: "학생식당",
-    items: ["라면", "계란말이"],
-    totalPrice: 5000,
-    status: "completed",
-    orderTime: "2024-01-23 18:15",
-    pickupTime: "2024-01-23 18:30",
-    isReviewed: true,
-  },
-]
+import { orderStorage, type LocalOrderDto } from "@/lib/auth"
 
 const statusConfig = {
   preparing: { label: "준비중", color: "bg-orange-500", icon: Clock },
@@ -83,37 +17,51 @@ const statusConfig = {
 
 export default function OrdersPage() {
   const [selectedTab, setSelectedTab] = useState("all")
-  // TODO: API 연동 - 주문 데이터 상태 관리
-  // const [orders, setOrders] = useState([])
-  // const [loading, setLoading] = useState(true)
+  const [orders, setOrders] = useState<LocalOrderDto[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // TODO: API 연동 - 주문 데이터 로딩
-  // useEffect(() => {
-  //   const loadOrders = async () => {
-  //     setLoading(true)
-  //     const orderData = await fetchOrders()
-  //     setOrders(orderData)
-  //     setLoading(false)
-  //   }
-  //   loadOrders()
-  // }, [])
+  // 실제 주문 데이터 로딩
+  useEffect(() => {
+    const loadOrders = async () => {
+      setLoading(true)
+      try {
+        const orderData = orderStorage.getOrders()
+        setOrders(orderData)
+      } catch (error) {
+        console.error("주문 내역 로딩 실패:", error)
+        setOrders([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadOrders()
 
-  // TODO: API 연동 - 탭 변경 시 필터링된 데이터 로딩
-  // useEffect(() => {
-  //   const loadFilteredOrders = async () => {
-  //     const status = selectedTab === 'all' ? undefined : selectedTab
-  //     const orderData = await fetchOrders(status)
-  //     setOrders(orderData)
-  //   }
-  //   loadFilteredOrders()
-  // }, [selectedTab])
+    // 주문 변경 이벤트 리스너
+    const handleOrdersChange = () => {
+      loadOrders()
+    }
 
+    window.addEventListener("ordersChanged", handleOrdersChange)
+    return () => window.removeEventListener("ordersChanged", handleOrdersChange)
+  }, [])
+
+  // 필터링된 주문 목록
   const filteredOrders = orders.filter((order) => {
     if (selectedTab === "all") return true
     if (selectedTab === "ongoing") return order.status !== "completed"
     if (selectedTab === "completed") return order.status === "completed"
     return true
   })
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">주문 내역을 불러오는 중...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -174,17 +122,17 @@ export default function OrdersPage() {
                     <div className="space-y-1 mb-3">
                       {order.items.map((item, index) => (
                         <p key={index} className="text-sm text-gray-700">
-                          • {item}
+                          • {item.menuName} x {item.quantity}
                         </p>
                       ))}
                     </div>
 
                     <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
                       <span>주문시간: {order.orderTime}</span>
-                      <span className="font-bold text-lg text-gray-900">{order.totalPrice.toLocaleString()}원</span>
+                      <span className="font-bold text-lg text-gray-900">{order.totalAmount.toLocaleString()}원</span>
                     </div>
 
-                    {order.status === "completed" && !order.isReviewed && (
+                    {order.status === "completed" && (
                       <Button variant="outline" size="sm" className="w-full">
                         <Star className="h-4 w-4 mr-1" />
                         후기 작성하기
@@ -194,14 +142,18 @@ export default function OrdersPage() {
                     {order.status === "ready" && (
                       <div className="bg-blue-50 p-3 rounded-lg">
                         <p className="text-sm font-medium text-blue-800">🔔 픽업 준비완료! 매장에서 수령해주세요</p>
-                        <p className="text-xs text-blue-600 mt-1">예상 픽업시간: {order.pickupTime}</p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          예상 픽업시간: {order.estimatedPickupTime || order.orderTime}
+                        </p>
                       </div>
                     )}
 
                     {order.status === "preparing" && (
                       <div className="bg-orange-50 p-3 rounded-lg">
                         <p className="text-sm font-medium text-orange-800">👨‍🍳 주문을 준비중입니다</p>
-                        <p className="text-xs text-orange-600 mt-1">예상 완료시간: {order.pickupTime}</p>
+                        <p className="text-xs text-orange-600 mt-1">
+                          예상 완료시간: {order.estimatedPickupTime || order.orderTime}
+                        </p>
                       </div>
                     )}
                   </CardContent>

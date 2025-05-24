@@ -1,93 +1,98 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Star, Heart } from "lucide-react"
 import Link from "next/link"
+import { favoriteStorage, storeAPI } from "@/lib/auth"
 
-// TODO: API 연동 - 즐겨찾기 데이터 가져오기
-// const fetchFavorites = async () => {
-//   try {
-//     const response = await fetch('/api/user/favorites', {
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//     return await response.json()
-//   } catch (error) {
-//     console.error('즐겨찾기 로딩 실패:', error)
-//     return []
-//   }
-// }
-
-// const removeFavorite = async (menuId: number) => {
-//   try {
-//     await fetch(`/api/menu/${menuId}/favorite`, {
-//       method: 'DELETE',
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//   } catch (error) {
-//     console.error('즐겨찾기 삭제 실패:', error)
-//   }
-// }
-
-// HARDCODED: 실제 API에서 가져와야 할 즐겨찾기 데이터
-const favoriteItems = [
-  {
-    id: 1,
-    name: "김치찌개",
-    price: 4500,
-    image: "/placeholder.svg?height=80&width=80",
-    storeName: "학생식당",
-    storeId: 1,
-    rating: 4.5,
-    tags: ["매운맛", "든든함", "따뜻함"],
-  },
-  {
-    id: 4,
-    name: "계란말이",
-    price: 2000,
-    image: "/placeholder.svg?height=80&width=80",
-    storeName: "학생식당",
-    storeId: 1,
-    rating: 4.2,
-    tags: ["부드러움", "담백함", "간단함"],
-  },
-  {
-    id: 7,
-    name: "아메리카노",
-    price: 3500,
-    image: "/placeholder.svg?height=80&width=80",
-    storeName: "카페 드림",
-    storeId: 2,
-    rating: 4.3,
-    tags: ["쓴맛", "카페인", "깔끔함"],
-  },
-]
+interface FavoriteItem {
+  id: number
+  name: string
+  price: number
+  image: string
+  storeName: string
+  storeId: number
+  rating: number
+  tags: string[]
+}
 
 export default function FavoritesPage() {
-  const [favorites, setFavorites] = useState(favoriteItems)
-  // TODO: API 연동 - 즐겨찾기 데이터 상태 관리
-  // const [loading, setLoading] = useState(true)
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // TODO: API 연동 - 즐겨찾기 데이터 로딩
-  // useEffect(() => {
-  //   const loadFavorites = async () => {
-  //     setLoading(true)
-  //     const favoriteData = await fetchFavorites()
-  //     setFavorites(favoriteData)
-  //     setLoading(false)
-  //   }
-  //   loadFavorites()
-  // }, [])
+  // 실제 즐겨찾기 데이터 로딩
+  useEffect(() => {
+    const loadFavorites = async () => {
+      setLoading(true)
+      try {
+        const favoriteIds = favoriteStorage.getFavorites()
 
+        if (favoriteIds.length === 0) {
+          setFavorites([])
+          return
+        }
+
+        // 모든 매장의 메뉴를 가져와서 즐겨찾기 메뉴 찾기
+        const stores = await storeAPI.getAllStores()
+        const favoriteMenus: FavoriteItem[] = []
+
+        for (const store of stores) {
+          try {
+            const menus = await storeAPI.getStoreMenus(store.id)
+            const storeFavorites = menus
+              .filter((menu) => favoriteIds.includes(menu.id))
+              .map((menu) => ({
+                id: menu.id,
+                name: menu.menuName,
+                price: menu.price,
+                image: "/placeholder.svg?height=80&width=80",
+                storeName: store.storeName,
+                storeId: store.id,
+                rating: store.rating || 4.5,
+                tags: ["맛있음", "추천"],
+              }))
+
+            favoriteMenus.push(...storeFavorites)
+          } catch (error) {
+            console.error(`매장 ${store.id} 메뉴 로딩 실패:`, error)
+          }
+        }
+
+        setFavorites(favoriteMenus)
+      } catch (error) {
+        console.error("즐겨찾기 로딩 실패:", error)
+        setFavorites([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadFavorites()
+
+    // 즐겨찾기 변경 이벤트 리스너
+    const handleFavoritesChange = () => {
+      loadFavorites()
+    }
+
+    window.addEventListener("favoritesChanged", handleFavoritesChange)
+    return () => window.removeEventListener("favoritesChanged", handleFavoritesChange)
+  }, [])
+
+  // 즐겨찾기 제거 함수
   const handleRemoveFavorite = (itemId: number) => {
+    favoriteStorage.toggleFavorite(itemId)
     setFavorites((prev) => prev.filter((item) => item.id !== itemId))
-    // TODO: API 연동 - 즐겨찾기 삭제
-    // removeFavorite(itemId)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">즐겨찾기를 불러오는 중...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -166,9 +171,11 @@ export default function FavoritesPage() {
                             매장 보기
                           </Button>
                         </Link>
-                        <Button size="sm" className="flex-1">
-                          주문하기
-                        </Button>
+                        <Link href={`/store/${item.storeId}`} className="flex-1">
+                          <Button size="sm" className="w-full">
+                            주문하기
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   </div>

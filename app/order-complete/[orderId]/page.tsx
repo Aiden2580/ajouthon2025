@@ -3,55 +3,75 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { CheckCircle, Clock, MapPin } from "lucide-react"
 import Link from "next/link"
-
-// TODO: API 연동 - 주문 상세 정보 가져오기
-// const fetchOrderDetails = async (orderId: string) => {
-//   try {
-//     const response = await fetch(`/api/orders/${orderId}`, {
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//     return await response.json()
-//   } catch (error) {
-//     console.error('주문 정보 로딩 실패:', error)
-//     return null
-//   }
-// }
+import { orderStorage, storeAPI, type LocalOrderDto } from "@/lib/auth"
+import { useState, useEffect } from "react"
 
 export default function OrderCompletePage({ params }: { params: { orderId: string } }) {
-  // TODO: API 연동 - 주문 데이터 상태 관리
-  // const [orderData, setOrderData] = useState(null)
-  // const [loading, setLoading] = useState(true)
+  const [orderData, setOrderData] = useState<LocalOrderDto | null>(null)
+  const [storeInfo, setStoreInfo] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  // TODO: API 연동 - 주문 데이터 로딩
-  // useEffect(() => {
-  //   const loadOrderData = async () => {
-  //     setLoading(true)
-  //     const data = await fetchOrderDetails(params.orderId)
-  //     setOrderData(data)
-  //     setLoading(false)
-  //   }
-  //   loadOrderData()
-  // }, [params.orderId])
+  // 실제 주문 데이터 로딩
+  useEffect(() => {
+    const loadOrderData = async () => {
+      setLoading(true)
+      try {
+        const order = orderStorage.findOrderById(params.orderId)
+        if (order) {
+          setOrderData(order)
 
-  // HARDCODED: 실제 API에서 가져와야 할 주문 데이터
-  const orderData = {
-    id: params.orderId,
-    orderNumber: `AO${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}001`,
-    storeName: "학생식당",
-    storeAddress: "아주대학교 학생회관 1층",
-    storePhone: "031-219-1234",
-    items: [
-      { name: "김치찌개", quantity: 2, price: 4500 },
-      { name: "불고기덮밥", quantity: 1, price: 5000 },
-    ],
-    totalAmount: 14000,
-    paymentMethod: "카드결제",
-    orderTime: new Date().toLocaleString("ko-KR"),
-    estimatedPickupTime: new Date(Date.now() + 15 * 60 * 1000).toLocaleString("ko-KR"), // 15분 후
-    specialRequest: "덜 맵게 해주세요",
-    status: "preparing",
+          // 매장 정보도 함께 로드
+          try {
+            const stores = await storeAPI.getAllStores()
+            const store = stores.find((s) => s.storeName === order.storeName)
+            if (store) {
+              setStoreInfo(store)
+            }
+          } catch (error) {
+            console.error("매장 정보 로딩 실패:", error)
+          }
+        } else {
+          // 주문을 찾을 수 없는 경우 기본값 설정
+          setOrderData({
+            id: params.orderId,
+            orderNumber: `AO${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}001`,
+            storeName: "매장명",
+            items: [],
+            totalAmount: 0,
+            orderTime: new Date().toLocaleString("ko-KR"),
+            status: "preparing",
+          })
+        }
+      } catch (error) {
+        console.error("주문 정보 로딩 실패:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadOrderData()
+  }, [params.orderId])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">주문 정보를 불러오는 중...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!orderData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">주문 정보를 불러올 수 없습니다</div>
+          <Link href="/orders">
+            <Button>주문내역으로 이동</Button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -75,12 +95,17 @@ export default function OrderCompletePage({ params }: { params: { orderId: strin
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4 text-orange-500" />
-                <span>예상 픽업시간: {orderData.estimatedPickupTime}</span>
+                <span>
+                  예상 픽업시간:{" "}
+                  {orderData.estimatedPickupTime || new Date(Date.now() + 15 * 60 * 1000).toLocaleString("ko-KR")}
+                </span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin className="h-4 w-4 text-blue-500" />
-                <span>{orderData.storeAddress}</span>
-              </div>
+              {storeInfo && (
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-4 w-4 text-blue-500" />
+                  <span>{storeInfo.storeLocation}</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -93,7 +118,7 @@ export default function OrderCompletePage({ params }: { params: { orderId: strin
               {orderData.items.map((item, index) => (
                 <div key={index} className="flex justify-between">
                   <span>
-                    {item.name} x {item.quantity}
+                    {item.menuName} x {item.quantity}
                   </span>
                   <span>{(item.price * item.quantity).toLocaleString()}원</span>
                 </div>
@@ -113,10 +138,6 @@ export default function OrderCompletePage({ params }: { params: { orderId: strin
           <CardContent className="p-4">
             <h3 className="font-medium mb-3">결제 정보</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>결제방법</span>
-                <span>{orderData.paymentMethod}</span>
-              </div>
               <div className="flex justify-between">
                 <span>주문시간</span>
                 <span>{orderData.orderTime}</span>
@@ -138,8 +159,7 @@ export default function OrderCompletePage({ params }: { params: { orderId: strin
             <ul className="text-sm text-orange-700 space-y-1">
               <li>• 주문 준비 완료 시 알림을 보내드립니다</li>
               <li>• 매장에서 주문번호를 말씀해 주세요</li>
-              <li>• 학생증을 지참해 주세요</li>
-              <li>• 문의사항: {orderData.storePhone}</li>
+              <li>• 문의사항: {storeInfo?.phone || "031-219-1234"}</li>
             </ul>
           </CardContent>
         </Card>

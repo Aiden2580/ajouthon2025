@@ -1,114 +1,71 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Plus, Minus, Trash2 } from "lucide-react"
 import Link from "next/link"
-
-// TODO: API 연동 - 장바구니 관련 API 함수들
-// const fetchCartItems = async () => {
-//   try {
-//     const response = await fetch('/api/cart', {
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//     return await response.json()
-//   } catch (error) {
-//     console.error('장바구니 로딩 실패:', error)
-//     return []
-//   }
-// }
-
-// const updateCartItemQuantity = async (itemId: number, quantity: number) => {
-//   try {
-//     await fetch(`/api/cart/${itemId}`, {
-//       method: 'PUT',
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       },
-//       body: JSON.stringify({ quantity })
-//     })
-//   } catch (error) {
-//     console.error('수량 업데이트 실패:', error)
-//   }
-// }
-
-// const removeCartItem = async (itemId: number) => {
-//   try {
-//     await fetch(`/api/cart/${itemId}`, {
-//       method: 'DELETE',
-//       headers: {
-//         'Authorization': `Bearer ${localStorage.getItem('token')}`
-//       }
-//     })
-//   } catch (error) {
-//     console.error('아이템 삭제 실패:', error)
-//   }
-// }
-
-const cartItems = [
-  {
-    id: 1,
-    name: "김치찌개",
-    price: 4500,
-    quantity: 2,
-    image: "/placeholder.svg?height=60&width=60",
-    storeName: "학생식당",
-  },
-  {
-    id: 2,
-    name: "불고기덮밥",
-    price: 5000,
-    quantity: 1,
-    image: "/placeholder.svg?height=60&width=60",
-    storeName: "학생식당",
-  },
-]
+import { cartStorage, type CartItem } from "@/lib/auth"
 
 export default function CartPage() {
-  const [items, setItems] = useState(cartItems)
-  // TODO: API 연동 - 장바구니 데이터 로딩
-  // const [loading, setLoading] = useState(true)
+  const [items, setItems] = useState<CartItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // TODO: API 연동 - 장바구니 데이터 로딩
-  // useEffect(() => {
-  //   const loadCartItems = async () => {
-  //     setLoading(true)
-  //     const cartData = await fetchCartItems()
-  //     setItems(cartData)
-  //     setLoading(false)
-  //   }
-  //   loadCartItems()
-  // }, [])
+  // 장바구니 데이터 로딩
+  useEffect(() => {
+    const loadCartItems = () => {
+      setLoading(true)
+      const cartItems = cartStorage.getItems()
+      setItems(cartItems)
+      setLoading(false)
+    }
+
+    loadCartItems()
+
+    // 장바구니 변경 감지
+    const handleStorageChange = () => {
+      loadCartItems()
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [])
 
   const updateQuantity = (id: number, change: number) => {
-    setItems((prev) =>
-      prev
-        .map((item) => (item.id === id ? { ...item, quantity: Math.max(0, item.quantity + change) } : item))
-        .filter((item) => item.quantity > 0),
-    )
-    // TODO: API 연동 - 수량 업데이트
-    // const newQuantity = items.find(item => item.id === id)?.quantity + change
-    // if (newQuantity > 0) {
-    //   updateCartItemQuantity(id, newQuantity)
-    // } else {
-    //   removeCartItem(id)
-    // }
+    const item = items.find((item) => item.id === id)
+    if (!item) return
+
+    const newQuantity = item.quantity + change
+
+    if (newQuantity <= 0) {
+      cartStorage.removeItem(id)
+    } else {
+      cartStorage.updateQuantity(id, newQuantity)
+    }
+
+    // 로컬 상태 업데이트
+    setItems(cartStorage.getItems())
   }
 
   const removeItem = (id: number) => {
-    setItems((prev) => prev.filter((item) => item.id !== id))
-    // TODO: API 연동 - 아이템 삭제
-    // removeCartItem(id)
+    cartStorage.removeItem(id)
+    setItems(cartStorage.getItems())
   }
 
-  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const deliveryFee = 1000
-  const finalPrice = totalPrice + deliveryFee
+  const totalPrice = cartStorage.getTotalPrice()
+  // const deliveryFee = 1000
+  const finalPrice = totalPrice // deliveryFee 제거
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-medium text-gray-900 mb-2">장바구니를 불러오는 중...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -148,14 +105,14 @@ export default function CartPage() {
                   <div key={item.id} className="p-4">
                     <div className="flex gap-3">
                       <img
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
+                        src="/placeholder.svg?height=60&width=60"
+                        alt={item.menuName}
                         className="w-16 h-16 rounded-lg object-cover"
                       />
                       <div className="flex-1">
                         <div className="flex items-start justify-between">
                           <div>
-                            <h3 className="font-medium">{item.name}</h3>
+                            <h3 className="font-medium">{item.menuName}</h3>
                             <p className="text-sm text-gray-500">{item.storeName}</p>
                             <p className="font-bold text-lg mt-1">{item.price.toLocaleString()}원</p>
                           </div>
@@ -206,10 +163,6 @@ export default function CartPage() {
                   <div className="flex justify-between">
                     <span>상품 금액</span>
                     <span>{totalPrice.toLocaleString()}원</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>배달비</span>
-                    <span>{deliveryFee.toLocaleString()}원</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">

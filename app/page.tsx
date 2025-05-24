@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import AuthGuard from "@/lib/AuthGuard"
-import { storeAPI } from "@/lib/auth"
+import { storeAPI, cartStorage } from "@/lib/auth"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +25,31 @@ function HomePage() {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [stores, setStores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // 실제 장바구니 개수 사용
+  const [cartCount, setCartCount] = useState(0)
+
+  // 장바구니 개수 실시간 업데이트
+  useEffect(() => {
+    const updateCartCount = () => {
+      setCartCount(cartStorage.getTotalCount())
+    }
+
+    // 초기 로드
+    updateCartCount()
+
+    // 장바구니 변경 이벤트 리스너
+    const handleCartChange = () => {
+      updateCartCount()
+    }
+
+    window.addEventListener("cartChanged", handleCartChange)
+    window.addEventListener("storage", handleCartChange)
+
+    return () => {
+      window.removeEventListener("cartChanged", handleCartChange)
+      window.removeEventListener("storage", handleCartChange)
+    }
+  }, [])
 
   // 컴포넌트 마운트 시 매장 데이터 로딩
   useEffect(() => {
@@ -32,23 +57,25 @@ function HomePage() {
       setLoading(true)
       try {
         const storeData = await storeAPI.getAllStores()
-        // API 응답을 기존 형태에 맞게 변환
+        // API 응답을 기존 형태에 맞게 변환 (이제 API에서 추가 정보 포함)
         const transformedStores = storeData.map((store: any) => ({
           id: store.id,
           name: store.storeName,
           category: "restaurant", // 기본값, 실제로는 API에서 카테고리 정보가 필요
-          image: "/placeholder.svg?height=120&width=200",
-          rating: 4.5, // 기본값, 실제로는 API에서 평점 정보가 필요
-          reviewCount: 0, // 기본값
-          distance: "도보 2분", // 기본값
-          isOpen: true, // 기본값
+          image: store.image,
+          rating: store.rating,
+          reviewCount: store.reviewCount,
+          distance: "도보 2분", // 기본값, 실제로는 위치 기반 계산 필요
+          isOpen: true, // 기본값, 실제로는 운영시간 기반 계산 필요
           tags: ["한식", "저렴함"], // 기본값
           menus: [], // 나중에 개별적으로 로드
+          storeLocation: store.storeLocation,
+          openTime: store.openTime,
+          phone: store.phone,
         }))
         setStores(transformedStores)
       } catch (error) {
         console.error("매장 데이터 로딩 실패:", error)
-        // 에러 시 빈 배열로 설정
         setStores([])
       } finally {
         setLoading(false)
@@ -171,7 +198,11 @@ function HomePage() {
               <Link href="/cart">
                 <div className="relative">
                   <ShoppingCart className="h-6 w-6" />
-                  <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 text-xs bg-red-500">2</Badge>
+                  {cartCount > 0 && (
+                    <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 text-xs bg-red-500">
+                      {cartCount}
+                    </Badge>
+                  )}
                 </div>
               </Link>
             </div>

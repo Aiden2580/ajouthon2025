@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, User, Bell, CreditCard, HelpCircle, LogOut, ChevronRight } from "lucide-react"
 import Link from "next/link"
-import { authStorage, authAPI, type UserDto } from "@/lib/auth"
+import { authStorage, authAPI, userStatsAPI, type UserDto } from "@/lib/auth"
 
 const menuItems = [
   {
@@ -38,7 +38,8 @@ export default function ProfilePage() {
   const [userData, setUserData] = useState<UserDto | null>(null)
   const [userStats, setUserStats] = useState({
     totalOrders: 0,
-    favoriteStore: "학생식당",
+    favoriteStore: "아직 없음",
+    totalAmount: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -49,9 +50,21 @@ export default function ProfilePage() {
         const user = authStorage.getUser()
         if (user) {
           // 최신 사용자 정보를 API에서 가져오기
-          const updatedUser = await authAPI.getUserInfo(user.email)
-          setUserData(updatedUser)
-          authStorage.setUser(updatedUser) // 로컬 스토리지 업데이트
+          try {
+            const updatedUser = await authAPI.getUserInfo(user.email)
+            setUserData(updatedUser)
+            authStorage.setUser(updatedUser) // 로컬 스토리지 업데이트
+
+            // 사용자 통계 계산
+            const stats = userStatsAPI.getUserStats(updatedUser.id)
+            setUserStats(stats)
+          } catch (error) {
+            console.error("최신 사용자 정보 로딩 실패:", error)
+            // API 실패 시 로컬 스토리지의 정보 사용
+            setUserData(user)
+            const stats = userStatsAPI.getUserStats(user.id)
+            setUserStats(stats)
+          }
         } else {
           // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
           window.location.href = "/auth/login"
@@ -60,7 +73,11 @@ export default function ProfilePage() {
         console.error("사용자 정보 로딩 실패:", error)
         // 에러 시 로컬 스토리지의 정보 사용
         const user = authStorage.getUser()
-        setUserData(user)
+        if (user) {
+          setUserData(user)
+          const stats = userStatsAPI.getUserStats(user.id)
+          setUserStats(stats)
+        }
       } finally {
         setLoading(false)
       }
