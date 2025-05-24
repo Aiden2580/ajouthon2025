@@ -44,6 +44,13 @@ export interface OrderDto {
   lastUpdatedAt: string
 }
 
+// 가게 주인용 주문 정보 (확장된 정보 포함)
+export interface BusinessOrderDto extends OrderDto {
+  userName?: string
+  userEmail?: string
+  menuName?: string
+}
+
 // 실제 백엔드 API URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://ajoutonback.hunian.site"
 
@@ -286,6 +293,26 @@ export const storeAPI = {
       return null
     }
   },
+
+  // 가게 주인의 매장 찾기 (이메일 기반)
+  findStoreByOwnerEmail: async (email: string): Promise<StoreDto | null> => {
+    try {
+      // TODO: 실제 API에서는 가게 주인의 이메일로 매장을 찾는 API가 필요
+      // 현재는 임시로 매장명에 이메일이 포함된 것으로 찾기
+      const stores = await storeAPI.getAllStores()
+
+      // 임시: 이메일의 첫 부분을 매장명으로 매칭 (예: test@ajou.ac.kr -> test 매장)
+      const emailPrefix = email.split("@")[0]
+      const store = stores.find(
+        (store) => store.storeName.toLowerCase().includes(emailPrefix.toLowerCase()) || store.id === 1, // 기본적으로 첫 번째 매장을 할당
+      )
+
+      return store || stores[0] || null // 매칭되는 매장이 없으면 첫 번째 매장 반환
+    } catch (error) {
+      console.error("가게 주인 매장 찾기 에러:", error)
+      return null
+    }
+  },
 }
 
 // 주문 관련 API
@@ -384,6 +411,156 @@ export const orderAPI = {
       return orders
     } catch (error) {
       console.error("사용자 주문 내역 조회 에러:", error)
+      throw error
+    }
+  },
+
+  // 매장별 주문 내역 조회 (가게 주인용)
+  getStoreOrders: async (storeId: number): Promise<BusinessOrderDto[]> => {
+    try {
+      // TODO: 실제 API 구현 필요
+      console.log("매장 주문 내역 조회 (미구현):", storeId)
+
+      // 임시 데이터 반환 (실제로는 API에서 가져와야 함)
+      const mockOrders: BusinessOrderDto[] = [
+        {
+          id: 1,
+          userId: 1,
+          storeId: storeId,
+          price: 4500,
+          status: "PENDING",
+          createdAt: new Date().toISOString(),
+          lastUpdatedAt: new Date().toISOString(),
+          userName: "홍길동",
+          userEmail: "student@ajou.ac.kr",
+          menuName: "김치찌개",
+        },
+        {
+          id: 2,
+          userId: 2,
+          storeId: storeId,
+          price: 5000,
+          status: "CONFIRMED",
+          createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+          lastUpdatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+          userName: "김철수",
+          userEmail: "student2@ajou.ac.kr",
+          menuName: "불고기덮밥",
+        },
+      ]
+
+      return mockOrders
+    } catch (error) {
+      console.error("매장 주문 내역 조회 에러:", error)
+      throw error
+    }
+  },
+}
+
+// 가게 주인용 메뉴 관리 API
+export const businessMenuAPI = {
+  // 메뉴 추가
+  addMenu: async (
+    storeId: number,
+    menuData: {
+      menuName: string
+      price: number
+      amount: number
+      description: string
+    },
+  ): Promise<MenuDto> => {
+    try {
+      console.log("메뉴 추가 시작:", { storeId, menuData })
+
+      // TODO: 실제 API 구현 필요
+      // const response = await fetch(`${API_BASE_URL}/store/${storeId}/menu`,
+      //   getFetchOptions("POST", menuData))
+
+      // 임시 응답 생성
+      const newMenu: MenuDto = {
+        id: Date.now(), // 임시 ID
+        storeId,
+        menuName: menuData.menuName,
+        price: menuData.price,
+        amount: menuData.amount,
+        description: menuData.description,
+        createdAt: new Date().toISOString(),
+        lastUpdatedAt: new Date().toISOString(),
+      }
+
+      console.log("메뉴 추가 성공 (임시):", newMenu)
+      return newMenu
+    } catch (error) {
+      console.error("메뉴 추가 에러:", error)
+      throw error
+    }
+  },
+
+  // 메뉴 수정
+  updateMenu: async (
+    menuId: number,
+    menuData: {
+      menuName?: string
+      price?: number
+      amount?: number
+      description?: string
+    },
+  ): Promise<MenuDto> => {
+    try {
+      console.log("메뉴 수정 시작:", { menuId, menuData })
+
+      // TODO: 실제 API 구현 필요
+      // const response = await fetch(`${API_BASE_URL}/menu/${menuId}`,
+      //   getFetchOptions("PUT", menuData))
+
+      // 임시 응답 생성
+      const updatedMenu: MenuDto = {
+        id: menuId,
+        storeId: 1, // 임시
+        menuName: menuData.menuName || "수정된 메뉴",
+        price: menuData.price || 0,
+        amount: menuData.amount || 0,
+        description: menuData.description || "",
+        createdAt: new Date().toISOString(),
+        lastUpdatedAt: new Date().toISOString(),
+      }
+
+      console.log("메뉴 수정 성공 (임시):", updatedMenu)
+      return updatedMenu
+    } catch (error) {
+      console.error("메뉴 수정 에러:", error)
+      throw error
+    }
+  },
+
+  // 메뉴 삭제
+  deleteMenu: async (menuId: number): Promise<void> => {
+    try {
+      console.log("메뉴 삭제 시작:", menuId)
+
+      // TODO: 실제 API 구현 필요
+      // const response = await fetch(`${API_BASE_URL}/menu/${menuId}`,
+      //   getFetchOptions("DELETE"))
+
+      console.log("메뉴 삭제 성공 (임시):", menuId)
+    } catch (error) {
+      console.error("메뉴 삭제 에러:", error)
+      throw error
+    }
+  },
+
+  // 메뉴 품절/재개
+  toggleMenuAvailability: async (menuId: number, amount: number): Promise<void> => {
+    try {
+      console.log("메뉴 품절/재개 시작:", { menuId, amount })
+
+      // TODO: 실제 API 구현 필요
+      // const response = await fetch(`${API_BASE_URL}/menu/${menuId}/amount`,
+      //   getFetchOptions("PUT", { amount }))
+
+      console.log("메뉴 품절/재개 성공 (임시):", { menuId, amount })
+    } catch (error) {
+      console.error("메뉴 품절/재개 에러:", error)
       throw error
     }
   },
@@ -631,6 +808,12 @@ export const authStorage = {
       return localStorage.getItem("isLoggedIn") === "true"
     }
     return false
+  },
+
+  // 사용자가 가게 주인인지 확인
+  isBusiness: (): boolean => {
+    const user = authStorage.getUser()
+    return user?.role === "BUSINESS"
   },
 
   logout: () => {
