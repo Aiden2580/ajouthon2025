@@ -44,9 +44,15 @@ export interface OrderDto {
   lastUpdatedAt: string
 }
 
-// 가게 주인용 주문 정보는 기본 OrderDto와 동일하게 사용
-export interface BusinessOrderDto extends OrderDto {
-  // 추가 정보가 필요하면 별도 API로 조회
+// 가게 주인용 주문 정보 (새로운 API 응답 형식)
+export interface BusinessOrderDto {
+  orderId: number
+  userId: number
+  userName: string
+  menuName: string
+  price: number
+  status: "PENDING" | "COMPLETED"
+  createdAt: string
 }
 
 // 실제 백엔드 API URL
@@ -378,43 +384,35 @@ export const orderAPI = {
   // 사용자별 주문 내역 조회 (추후 API 추가 시 사용)
   getUserOrders: async (userId: number): Promise<OrderDto[]> => {
     try {
-      const response = await fetch(`http://ajoutonback.hunian.site/orders/all_detail?userId=${userId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`주문 내역 조회 실패: ${errorText}`)
-      }
-
-      const orders: OrderDto[] = await response.json()
-      return orders
+      // TODO: 백엔드에 사용자별 주문 내역 API가 추가되면 구현
+      console.log("사용자 주문 내역 조회 (미구현):", userId)
+      return []
     } catch (error) {
       console.error("사용자 주문 내역 조회 에러:", error)
       throw error
     }
   },
 
-  // 매장별 주문 내역 조회 (가게 주인용) - 실제 API 연동 필요
+  // 매장별 주문 내역 조회 (가게 주인용) - 실제 API 연동
   getStoreOrders: async (storeId: number): Promise<BusinessOrderDto[]> => {
     try {
       console.log("매장 주문 내역 조회:", storeId)
 
-      // TODO: 실제 매장별 주문 조회 API 엔드포인트 필요
-      // 현재는 모든 주문을 조회할 수 있는 API가 없으므로 임시 구현
+      // GET 요청에서 storeId를 쿼리 파라미터로 전송
+      const url = `${API_BASE_URL}/orders/store_order?storeId=${storeId}`
+      const response = await fetch(url, getFetchOptions("GET"))
 
-      // 임시로 빈 배열 반환하되, 실제 구현 시 아래와 같이 호출
-      // const response = await fetch(`${API_BASE_URL}/orders/store/${storeId}`, getFetchOptions("GET"))
-      // if (!response.ok) {
-      //   throw new Error("매장 주문 내역을 가져올 수 없습니다.")
-      // }
-      // return await response.json()
+      console.log("매장 주문 응답 상태:", response.status, response.statusText)
 
-      console.warn("매장별 주문 조회 API가 구현되지 않음 - 빈 배열 반환")
-      return []
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("매장 주문 조회 실패:", errorText)
+        throw new Error("매장 주문 내역을 가져올 수 없습니다: " + errorText)
+      }
+
+      const orders = await response.json()
+      console.log("조회된 매장 주문:", orders)
+      return orders
     } catch (error) {
       console.error("매장 주문 내역 조회 에러:", error)
       throw error
@@ -745,11 +743,12 @@ export const favoriteStorage = {
 
 // 주문 내역 로컬 스토리지 관리
 export interface LocalOrderDto {
+  price: number
   id: string
   orderNumber: string
   storeName: string
   items: { menuName: string; quantity: number; price: number }[]
-  price: number
+  totalAmount: number
   orderTime: string
   status: "preparing" | "ready" | "completed"
   specialRequest?: string
@@ -827,12 +826,12 @@ export const userStatsAPI = {
         : "아직 없음"
 
     // 총 주문 금액
-    const price = userOrders.reduce((sum, order) => sum + order.price, 0)
+    const totalAmount = userOrders.reduce((sum, order) => sum + order.totalAmount, 0)
 
     return {
       totalOrders,
       favoriteStore,
-      price,
+      totalAmount,
     }
   },
 }
