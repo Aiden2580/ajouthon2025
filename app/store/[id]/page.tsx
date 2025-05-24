@@ -187,11 +187,14 @@ export default function StorePage({ params }: { params: { id: string } }) {
       <div className="max-w-md mx-auto">
         {/* Store Info */}
         <div className="bg-white">
-          <img
+          {/* <img
             src={storeData?.image || "/placeholder.svg?height=200&width=400"}
             alt={storeData?.storeName}
             className="w-full h-48 object-cover"
-          />
+          /> */}
+          <div className="w-full h-48 flex items-center justify-center bg-gray-100 text-6xl">
+  🏬
+</div>
           <div className="p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">{storeData?.storeName}</h2>
@@ -240,11 +243,14 @@ export default function StorePage({ params }: { params: { id: string } }) {
               filteredMenus.map((item) => (
                 <div key={item.id} className="p-4">
                   <div className="flex gap-3">
-                    <img
+                    {/* <img
                       src="/placeholder.svg?height=80&width=80"
                       alt={item.menuName}
                       className="w-20 h-20 rounded-lg object-cover"
-                    />
+                    /> */}
+                      <div className="w-full h-48 flex items-center justify-center text-7xl bg-gray-100">
+                    <span role="img" aria-label="store">☕️</span>
+                  </div>
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
                         <div>
